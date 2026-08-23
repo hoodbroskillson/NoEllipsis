@@ -8,7 +8,7 @@ import pytest
 
 from noellipsis.cli import main
 from noellipsis.compare import compare_files
-from noellipsis.config import Config, apply_cli_overrides, load_pyproject
+from noellipsis.config import Config, ConfigError, apply_cli_overrides, load_pyproject
 from noellipsis.formatters import format_result
 from noellipsis.git import GitError, parse_diff, run_git, scan_git_diff
 from noellipsis.models import Finding, ScanResult, Severity
@@ -111,8 +111,8 @@ def test_finding_without_line() -> None:
 def test_load_pyproject_invalid_and_no_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "pyproject.toml").write_text("not = [toml\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    cfg = load_pyproject(tmp_path)
-    assert cfg.shrink_threshold == 40
+    with pytest.raises(ConfigError):
+        load_pyproject(tmp_path)
     (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
     cfg = load_pyproject(tmp_path / "pyproject.toml")
     assert cfg.fail_on == "error"
@@ -120,9 +120,8 @@ def test_load_pyproject_invalid_and_no_table(tmp_path: Path, monkeypatch: pytest
         '[tool.noellipsis]\nshrink-threshold = "nope"\nfail-on = "bogus"\nexclude = "one"\n',
         encoding="utf-8",
     )
-    cfg = load_pyproject(tmp_path)
-    assert cfg.shrink_threshold == 40
-    assert cfg.fail_on == "error"
+    with pytest.raises(ConfigError):
+        load_pyproject(tmp_path)
 
 
 def test_apply_cli_none_exclude() -> None:

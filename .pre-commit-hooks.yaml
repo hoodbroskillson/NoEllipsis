@@ -1,0 +1,22 @@
+# Consumer config (pin the git tag):
+#
+# repos:
+#   - repo: https://github.com/hoodbroskillson/NoEllipsis
+#     rev: v1.0.0
+#     hooks:
+#       - id: noellipsis
+#
+# Exit codes from this hook (same as the CLI):
+#   0 — no findings at or above --fail-on (default: error)
+#   1 — one or more findings at or above the threshold
+#   2 — not a git repository, invalid arguments, or a read error
+#
+# The hook runs `noellipsis git-diff --staged` with no filename arguments
+# and never stages, commits, resets, restores, or checks out files.
+- id: noellipsis
+  name: noellipsis
+  description: Scan staged diffs for incomplete or truncated LLM-generated code
+  entry: noellipsis git-diff --staged
+  language: python
+  pass_filenames: false
+  always_run: true

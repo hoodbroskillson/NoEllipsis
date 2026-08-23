@@ -15,3 +15,5 @@ Include a minimal file that reproduces the problem. Do not attach production sec
 ## Non-goals
 
 NoEllipsis is not a vulnerability scanner for the projects you point it at. Findings about placeholders and truncation are quality checks, not CVEs.
+
+Supported versions: the latest `v*.*.*` tag on this repository.

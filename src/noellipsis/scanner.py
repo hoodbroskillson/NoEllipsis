@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from noellipsis.config import Config
+from noellipsis.lex import Kind, regions_for
 from noellipsis.models import Finding, ScanResult
 from noellipsis.rules.generic_rules import GenericRules, looks_minified
 from noellipsis.rules.markdown_rules import MarkdownRules
-from noellipsis.rules.placeholders import comment_start
 from noellipsis.rules.python_rules import PythonRules
 
 SUPPRESS_LINE = re.compile(
@@ -163,7 +163,7 @@ class Scanner:
         for finding in findings:
             if self.config.is_disabled(finding.rule_id):
                 continue
-            if _line_suppressed(lines, finding.line, finding.rule_id, lang):
+            if _line_suppressed(lines, finding.line, finding.rule_id, lang, text=text):
                 continue
             kept.append(finding)
         return kept
@@ -233,15 +233,9 @@ def path_is_excluded(path: Path, config: Config, *, root: Path | None = None) ->
     return False
 
 
-def _comment_text(line: str, language: str = "") -> str:
-    start = comment_start(line, language)
-    return "" if start is None else line[start:]
-
-
 def file_is_suppressed(text: str, language: str = "") -> bool:
-    for line in text.splitlines():
-        comment = _comment_text(line, language)
-        if comment and SUPPRESS_FILE.search(comment):
+    for region in regions_for(text, language):
+        if region.kind == Kind.COMMENT and SUPPRESS_FILE.search(text[region.start : region.end]):
             return True
     return False
 
@@ -253,65 +247,49 @@ def _ids_in_ignore(comment: str) -> set[str]:
     return {part.strip().upper() for part in match.group(1).split(",") if part.strip()}
 
 
-def _docstring_quote(stripped: str) -> str | None:
-    i = 0
-    if i < len(stripped) and stripped[i] in "rRuUbBfF":
-        i += 1
-        if i < len(stripped) and stripped[i] in "rRuUbBfF":
-            i += 1
-    dq, sq = '"""', "'''"
-    if stripped.startswith((dq, sq), i):
-        return stripped[i : i + 3]
-    return None
-
-
-def _header_rule_suppressed(lines: list[str], rule_id: str, language: str) -> bool:
-    rid = rule_id.upper()
-    in_docstring = False
-    quote = ""
-    for text in lines:
-        if in_docstring:
-            if quote and quote in text:
-                in_docstring = False
+def _comments_on_lines(text: str, language: str) -> dict[int, list[str]]:
+    by_line: dict[int, list[str]] = {}
+    for region in regions_for(text, language):
+        if region.kind != Kind.COMMENT:
             continue
-        stripped = text.strip()
-        comment = _comment_text(text, language)
-        if comment:
-            if rid in _ids_in_ignore(comment):
+        snippet = text[region.start : region.end]
+        start_line = text.count("\n", 0, region.start) + 1
+        for i, part in enumerate(snippet.splitlines()):
+            by_line.setdefault(start_line + i, []).append(part)
+    return by_line
+
+
+def _header_rule_suppressed(text: str, rule_id: str, language: str) -> bool:
+    rid = rule_id.upper()
+    for region in regions_for(text, language):
+        chunk = text[region.start : region.end]
+        if region.kind == Kind.COMMENT:
+            if rid in _ids_in_ignore(chunk):
                 return True
             continue
-        if not stripped:
+        if region.kind == Kind.STRING:
             continue
-        if stripped.startswith("#!"):
+        stripped = chunk.strip()
+        if not stripped or stripped.startswith("#!"):
             continue
-        if language == "python":
-            q = _docstring_quote(stripped)
-            if q is not None:
-                after = stripped[stripped.find(q) + 3 :]
-                if q not in after:
-                    in_docstring = True
-                    quote = q
-                continue
         break
     return False
 
 
-def _line_suppressed(lines: list[str], line: int | None, rule_id: str, language: str = "") -> bool:
+def _line_suppressed(
+    lines: list[str], line: int | None, rule_id: str, language: str = "", text: str | None = None
+) -> bool:
     rid = rule_id.upper()
+    body = text if text is not None else "\n".join(lines)
     if line is None or line == 1:
-        if _header_rule_suppressed(lines, rid, language):
+        if _header_rule_suppressed(body, rid, language):
             return True
         if line is None:
             return False
-    candidates = []
+    comments = _comments_on_lines(body, language)
     for offset in range(0, 3):
-        idx = line - 1 - offset
-        if 0 <= idx < len(lines):
-            candidates.append(lines[idx])
-    for text in candidates:
-        comment = _comment_text(text, language)
-        if not comment:
-            continue
-        if rid in _ids_in_ignore(comment):
-            return True
+        lineno = line - offset
+        for comment in comments.get(lineno, []):
+            if rid in _ids_in_ignore(comment):
+                return True
     return False

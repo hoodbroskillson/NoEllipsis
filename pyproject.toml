@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,15 +7,15 @@ name = "noellipsis"
 version = "1.0.0"
 description = "Detect incomplete or dangerously truncated LLM-generated code before paste, commit, or deploy."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "hoodbroskillson" }]
 requires-python = ">=3.11"
 keywords = ["llm", "code-review", "cli", "static-analysis", "placeholders"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -29,14 +29,22 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.6",
+    "build>=1.2",
+    "twine>=5.0",
+]
+release = [
+    "build>=1.2",
+    "twine>=5.0",
 ]
 
 [project.scripts]
 noellipsis = "noellipsis.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/jamesschmidt/noellipsis"
-Issues = "https://github.com/jamesschmidt/noellipsis/issues"
+Homepage = "https://github.com/hoodbroskillson/NoEllipsis"
+Repository = "https://github.com/hoodbroskillson/NoEllipsis"
+Issues = "https://github.com/hoodbroskillson/NoEllipsis/issues"
+Changelog = "https://github.com/hoodbroskillson/NoEllipsis/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

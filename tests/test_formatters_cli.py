@@ -24,6 +24,7 @@ def test_text_format() -> None:
     text = format_result(ScanResult(findings=[_finding()]), "text")
     assert "src/example.py:84:5 ERROR NE002 Bare ellipsis used as function body" in text
     assert "Replace the placeholder" in text
+    assert "1 finding: 1 error" in text
 
 
 def test_json_stable() -> None:
@@ -120,3 +121,28 @@ def test_cli_verbose(tmp_path: Path, capsys) -> None:
     assert main(["--verbose", "check", str(path)]) == 0
     err = capsys.readouterr().err
     assert "scanning" in err
+
+
+def test_github_escapes_specials() -> None:
+    finding = Finding(
+        rule_id="NE001",
+        severity=Severity.ERROR,
+        path="path,with:percent%.py",
+        message="line1\nline2,colon:",
+        suggestion="fix",
+        line=1,
+        column=1,
+    )
+    text = format_result(ScanResult(findings=[finding]), "github")
+    assert "file=path%2Cwith%3Apercent%25.py" in text
+    assert "%0A" in text
+    assert "%3A" in text or "colon" in text
+
+
+def test_text_mixed_summary() -> None:
+    findings = [
+        Finding("NE002", Severity.ERROR, "a.py", "e", "s", 1, 1),
+        Finding("NE003", Severity.WARNING, "b.py", "w", "s", 2, 1),
+    ]
+    text = format_result(ScanResult(findings=findings), "text")
+    assert text.endswith("2 findings: 1 error, 1 warning\n")

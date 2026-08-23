@@ -9,11 +9,58 @@ from pathlib import Path
 
 from noellipsis import __version__
 from noellipsis.compare import compare_files
-from noellipsis.config import apply_cli_overrides, load_pyproject
+from noellipsis.config import ConfigError, apply_cli_overrides, load_pyproject
 from noellipsis.formatters import format_result
 from noellipsis.git import GitError, scan_git_diff
 from noellipsis.models import ScanResult
 from noellipsis.scanner import Scanner
+
+_SHARED_VALUE = {
+    "--format",
+    "--fail-on",
+    "--exclude",
+    "--disable",
+    "--shrink-threshold",
+}
+_SHARED_FLAGS = {"--verbose"}
+
+
+def _hoist_shared(argv: list[str]) -> list[str]:
+    """Allow shared options before or after the subcommand."""
+    shared: list[str] = []
+    other: list[str] = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        name = arg.split("=", 1)[0]
+        if name in _SHARED_VALUE:
+            if "=" in arg:
+                shared.append(arg)
+                i += 1
+                continue
+            shared.append(arg)
+            i += 1
+            if i < len(argv):
+                shared.append(argv[i])
+                i += 1
+            continue
+        if name in _SHARED_FLAGS:
+            shared.append(arg)
+            i += 1
+            continue
+        other.append(arg)
+        i += 1
+    return shared + other
+
+
+def _threshold(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("--shrink-threshold must be an integer from 0 to 100") from exc
+    if number < 0 or number > 100:
+        raise argparse.ArgumentTypeError("--shrink-threshold must be an integer from 0 to 100")
+    return number
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -54,10 +101,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--shrink-threshold",
-        type=int,
+        type=_threshold,
         default=None,
         metavar="N",
-        help="Percent size reduction that triggers NE101 (default: 40)",
+        help="Percent size reduction that triggers NE101 (0-100, default: 40)",
     )
     parser.add_argument("--verbose", action="store_true", help="Print scan progress on stderr")
 
@@ -98,8 +145,9 @@ def _exit_from(result: ScanResult, fail_on: str) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
+    raw = list(argv) if argv is not None else sys.argv[1:]
     try:
-        args = parser.parse_args(list(argv) if argv is not None else None)
+        args = parser.parse_args(_hoist_shared(raw))
     except SystemExit as exc:
         code = exc.code
         if code is None:
@@ -109,10 +157,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.command:
         parser.print_help()
         return 0
-
-    if args.shrink_threshold is not None and args.shrink_threshold < 0:
-        print("error: --shrink-threshold must be >= 0", file=sys.stderr)
-        return 2
 
     start = Path.cwd()
     if args.command == "check":
@@ -130,7 +174,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             shrink_threshold=args.shrink_threshold,
             verbose=args.verbose,
         )
-    except Exception as exc:  # pragma: no cover
+    except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

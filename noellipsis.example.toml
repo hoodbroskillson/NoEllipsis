@@ -1,5 +1,9 @@
 # Copy the table below into your project's pyproject.toml
 # or keep this file as a reference.
+#
+# shrink-threshold is an integer 0-100.
+# fail-on is "error" or "warning".
+# Invalid values make the CLI exit 2.
 
 [tool.noellipsis]
 shrink-threshold = 40

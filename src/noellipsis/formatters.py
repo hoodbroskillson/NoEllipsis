@@ -22,6 +22,25 @@ def format_result(result: ScanResult, fmt: str) -> str:
     return _text(findings)
 
 
+def _count_phrase(n: int, singular: str) -> str:
+    return f"{n} {singular}" if n == 1 else f"{n} {singular}s"
+
+
+def _summary_line(findings: list[Finding]) -> str:
+    errors = sum(1 for f in findings if f.severity == Severity.ERROR)
+    warnings = sum(1 for f in findings if f.severity == Severity.WARNING)
+    infos = sum(1 for f in findings if f.severity == Severity.INFO)
+    bits: list[str] = []
+    if errors:
+        bits.append(_count_phrase(errors, "error"))
+    if warnings:
+        bits.append(_count_phrase(warnings, "warning"))
+    if infos:
+        bits.append(_count_phrase(infos, "info"))
+    head = _count_phrase(len(findings), "finding")
+    return f"{head}: {', '.join(bits)}" if bits else f"{head}"
+
+
 def _text(findings: list[Finding]) -> str:
     if not findings:
         return "No issues found.\n"
@@ -34,21 +53,22 @@ def _text(findings: list[Finding]) -> str:
                 loc += f":{f.column}"
         parts.append(f"{loc} {f.severity.value.upper()} {f.rule_id} {f.message}")
         parts.append(f"  {f.suggestion}")
+    parts.append(_summary_line(findings))
     return "\n".join(parts) + "\n"
 
 
 def _json(findings: list[Finding], result: ScanResult) -> str:
     payload = {
-        "files_scanned": result.files_scanned,
         "count": len(findings),
+        "files_scanned": result.files_scanned,
         "findings": [
             {
-                "rule_id": f.rule_id,
-                "severity": f.severity.value,
+                "column": f.column,
                 "file": f.path,
                 "line": f.line,
-                "column": f.column,
                 "message": f.message,
+                "rule_id": f.rule_id,
+                "severity": f.severity.value,
                 "suggestion": f.suggestion,
             }
             for f in findings
@@ -57,16 +77,31 @@ def _json(findings: list[Finding], result: ScanResult) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
+def _escape_data(value: str) -> str:
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _escape_prop(value: str) -> str:
+    return (
+        value.replace("%", "%25")
+        .replace("\r", "%0D")
+        .replace("\n", "%0A")
+        .replace(":", "%3A")
+        .replace(",", "%2C")
+    )
+
+
 def _github(findings: list[Finding]) -> str:
     if not findings:
         return ""
     lines: list[str] = []
     for f in findings:
-        bits = [f"file={f.path}"]
+        bits = [f"file={_escape_prop(f.path)}"]
         if f.line is not None:
             bits.append(f"line={f.line}")
         if f.column is not None:
             bits.append(f"col={f.column}")
         level = _GH[f.severity]
-        lines.append(f"::{level} {','.join(bits)}::{f.rule_id} {f.message}")
+        message = _escape_data(f"{f.rule_id} {f.message}")
+        lines.append(f"::{level} {','.join(bits)}::{message}")
     return "\n".join(lines) + "\n"

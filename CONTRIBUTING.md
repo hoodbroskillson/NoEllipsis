@@ -9,22 +9,23 @@ Thanks for helping keep NoEllipsis small, local, and deterministic.
 3. **Never modify scanned files or Git state.**
 4. **Prefer misses over false positives.** Add a regression test for every “do not flag” case.
 5. **Stable rule IDs.** Do not reuse `NE00x` / `NE10x` for a different meaning.
+6. **Shared lexer.** New comment/string-aware logic belongs in `noellipsis.lex`, not a one-off regex.
 
 ## Setup
 
 ```bash
 python -m pip install -e ".[dev]"
-ruff check
+ruff check .
 pytest -q
 ```
 
-Python 3.11+ is required for development that matches CI (3.11, 3.12, 3.13).
+Python 3.11+ is required. CI also runs 3.12 and 3.13, plus one Windows and one macOS job.
 
 ## Adding a rule
 
 - Give it a stable id and a default severity.
 - Implement it in `src/noellipsis/rules/`.
-- Document it in the README table.
+- Document it in the README table and CHANGELOG.
 - Add a positive test and at least one false-positive test.
 
 ## Pull requests
@@ -32,3 +33,11 @@ Python 3.11+ is required for development that matches CI (3.11, 3.12, 3.13).
 - Keep changes focused.
 - Do not add runtime dependencies.
 - Run ruff and pytest before you push.
+
+## Release checklist
+
+1. Version is `1.0.0` (or the next semver) in `pyproject.toml` and `src/noellipsis/__init__.py`.
+2. `CHANGELOG.md` has a dated section.
+3. `ruff check .` and `pytest -q` pass; coverage stays at or above 90%.
+4. `python -m build && python -m twine check dist/*` (from the `dev` or `release` extra).
+5. Tag `vX.Y.Z` matching the version. The release workflow publishes a GitHub release only — never PyPI.

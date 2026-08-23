@@ -51,6 +51,10 @@ DEFAULT_EXCLUDES = [
 ]
 
 
+class ConfigError(ValueError):
+    """Invalid configuration in CLI or pyproject.toml."""
+
+
 @dataclass
 class Config:
     shrink_threshold: int = 40
@@ -74,6 +78,17 @@ def _as_str_list(value: object) -> list[str]:
     return []
 
 
+
+def _parse_threshold(value: object, *, source: str) -> int:
+    try:
+        threshold_i = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{source}: shrink-threshold must be an integer from 0 to 100") from exc
+    if threshold_i < 0 or threshold_i > 100:
+        raise ConfigError(f"{source}: shrink-threshold must be an integer from 0 to 100")
+    return threshold_i
+
+
 def load_pyproject(start: Path | None = None) -> Config:
     """Walk upward from *start* (or cwd) looking for [tool.noellipsis]."""
     cfg = Config()
@@ -87,8 +102,10 @@ def load_pyproject(start: Path | None = None) -> Config:
         try:
             raw = candidate.read_text(encoding="utf-8")
             data = tomllib.loads(raw)
-        except (OSError, tomllib.TOMLDecodeError):
+        except OSError:
             continue
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError(f"invalid TOML in {candidate}: {exc}") from exc
         tool = data.get("tool", {}).get("noellipsis")
         if not isinstance(tool, dict):
             # Keep walking; this pyproject may belong to another project.
@@ -99,14 +116,13 @@ def load_pyproject(start: Path | None = None) -> Config:
         disable = _as_str_list(tool.get("disable"))
         threshold = tool.get("shrink-threshold", tool.get("shrink_threshold", cfg.shrink_threshold))
         fail_on = str(tool.get("fail-on", tool.get("fail_on", cfg.fail_on)))
-        try:
-            threshold_i = int(threshold)
-        except (TypeError, ValueError):
-            threshold_i = cfg.shrink_threshold
+        threshold_i = _parse_threshold(threshold, source=str(candidate))
+        if fail_on not in {"error", "warning"}:
+            raise ConfigError(f"{candidate}: fail-on must be 'error' or 'warning'")
         return replace(
             cfg,
             shrink_threshold=threshold_i,
-            fail_on=fail_on if fail_on in {"error", "warning"} else "error",
+            fail_on=fail_on,
             exclude=list(DEFAULT_EXCLUDES) + extras,
             disable=disable,
         )

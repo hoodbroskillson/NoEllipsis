@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from noellipsis.lex import Kind, regions_for
+
 # Stub-like phrases commonly emitted by LLMs when they skip an implementation.
 _PHRASE_RES = [
     re.compile(r"rest of (?:the )?(?:code|implementation|authentication|function|method|logic).{0,40}unchanged", re.I),
@@ -22,19 +24,6 @@ _PHRASE_RES = [
     re.compile(r"not implemented(?: yet)?\s*[.!]?\s*$", re.I),
 ]
 
-_HASH_COMMENT_LANGS = {"python", "ruby", "shell", "php"}
-_SLASH_COMMENT_LANGS = {
-    "javascript",
-    "typescript",
-    "java",
-    "go",
-    "rust",
-    "c",
-    "cpp",
-    "csharp",
-    "php",
-}
-
 
 @dataclass(frozen=True)
 class PhraseHit:
@@ -45,66 +34,29 @@ class PhraseHit:
 
 def comment_start(line: str, language: str = "") -> int | None:
     """Index where a language-aware comment begins, or None. Strings are not comments."""
-    i = 0
-    n = len(line)
-    quote: str | None = None
-    lang = (language or "").lower()
-    allow_hash = lang in _HASH_COMMENT_LANGS or lang == ""
-    allow_slash = lang in _SLASH_COMMENT_LANGS or lang == ""
-    allow_html = lang in {"markdown", ""} or lang not in _HASH_COMMENT_LANGS
-    if lang == "markdown":
-        allow_hash = False
-        allow_slash = False
-        allow_html = True
-    while i < n:
-        ch = line[i]
-        if quote:
-            if ch == "\\" and quote in {"'", '"', "`"}:
-                i += 2
-                continue
-            if line.startswith(quote, i):
-                i += len(quote)
-                quote = None
-                continue
-            i += 1
-            continue
-        if line.startswith(('"""', "'''"), i):
-            quote = line[i : i + 3]
-            i += 3
-            continue
-        if ch in {"'", '"', "`"}:
-            quote = ch
-            i += 1
-            continue
-        if allow_hash and ch == "#":
-            return i
-        if allow_slash and (line.startswith("//", i) or line.startswith("/*", i)):
-            return i
-        if allow_html and line.startswith("<!--", i):
-            return i
-        i += 1
+    for region in regions_for(line if line.endswith("\n") else line + "\n", language):
+        if region.kind == Kind.COMMENT:
+            return region.start
     return None
 
 
 def find_placeholder_hits(text: str, *, language: str = "") -> list[PhraseHit]:
     """Flag placeholder phrases only in comments, not quoted documentation."""
     hits: list[PhraseHit] = []
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        cstart = comment_start(line, language)
-        if cstart is None:
+    for region in regions_for(text, language):
+        if region.kind != Kind.COMMENT:
             continue
-        region = line[cstart:]
+        region_text = text[region.start : region.end]
         for pat in _PHRASE_RES:
-            match = pat.search(region)
-            if match:
-                hits.append(
-                    PhraseHit(
-                        line=lineno,
-                        column=cstart + match.start() + 1,
-                        snippet=match.group(0),
-                    )
-                )
-                break
+            match = pat.search(region_text)
+            if not match:
+                continue
+            abs_off = region.start + match.start()
+            line = text.count("\n", 0, abs_off) + 1
+            last_nl = text.rfind("\n", 0, abs_off)
+            column = abs_off + 1 if last_nl < 0 else abs_off - last_nl
+            hits.append(PhraseHit(line=line, column=column, snippet=match.group(0)))
+            break
     return hits
 
 

@@ -1,29 +1,38 @@
 # NoEllipsis
 
+[![CI](https://github.com/hoodbroskillson/NoEllipsis/actions/workflows/ci.yml/badge.svg)](https://github.com/hoodbroskillson/NoEllipsis/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/hoodbroskillson/NoEllipsis)](https://github.com/hoodbroskillson/NoEllipsis/releases)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A fast, **local** CLI that detects incomplete or dangerously truncated LLM-generated code **before** you paste, commit, or deploy it.
 
 NoEllipsis is a deterministic static checker. It does **not** call a model, does **not** need an API key, and **never** uploads your source. It never executes the files it scans and never changes Git state.
 
 It is **not** an AI-content detector, a full compiler, a vulnerability scanner, a rewriter, or a hosted service.
 
-## Why it exists
+![Terminal demo](docs/demo.svg)
 
-LLMs often emit:
+## 30-second demo
 
-- `def calculate_total(): ...`
-- `// Rest of authentication code unchanged`
-- A 40-line snippet in place of a 400-line module
-- An unclosed Markdown fence
-- A file that drops half the imports and two public functions
+```bash
+python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.0.0"
+noellipsis --version
+noellipsis check examples/ok_examples.py --format text
+noellipsis check examples/incomplete.py --format text
+noellipsis compare examples/generated_snippet.py --against examples/original_module.py --format text
+```
 
-Those failures are cheap to catch with an AST walk and a few conservative heuristics. They are expensive if they land in `main`.
+A clean file prints `No issues found.` An unfinished function reports `NE002` and a one-line count such as `1 finding: 1 error`. Compare reports shrink / removed-symbol rules (`NE101`–`NE104`) plus any placeholders in the candidate.
+
+The image above is a static terminal snapshot generated from real CLI output (see `docs/demo.tape`). It is not an animated GIF.
 
 ## Install
 
-Requires Python 3.11+.
+Requires Python 3.11+. There is no PyPI package; install from the git tag:
 
 ```bash
-python -m pip install .
+python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.0.0"
 ```
 
 Then:
@@ -33,15 +42,28 @@ noellipsis --help
 python -m noellipsis --help
 ```
 
-Development:
+Local development:
 
 ```bash
 python -m pip install -e ".[dev]"
-ruff check
+ruff check .
 pytest -q
 ```
 
+The `dev` extra includes pytest, ruff, build, and twine. Runtime dependencies remain empty.
+
 ## Commands
+
+Shared options may appear **before or after** the subcommand:
+
+```bash
+noellipsis --format json check src/
+noellipsis check src/ --format json
+noellipsis --fail-on warning compare candidate.py --against original.py
+noellipsis compare candidate.py --against original.py --fail-on warning
+noellipsis --format github git-diff --staged
+noellipsis git-diff --staged --format github
+```
 
 ### `noellipsis check FILE_OR_DIRECTORY`
 
@@ -57,7 +79,7 @@ noellipsis check examples/incomplete.py --format text
 Compare a model’s candidate against the file it was supposed to edit. Reports percent size reduction, removed top-level functions/classes/methods, removed imports, snippet-as-replacement, and any placeholders the candidate introduced.
 
 ```bash
-noellipsis compare generated.py --against original.py
+noellipsis compare examples/generated_snippet.py --against examples/original_module.py
 ```
 
 ### `noellipsis git-diff` / `noellipsis git-diff --staged`
@@ -79,8 +101,10 @@ Outside a repository the command exits `2` with a clear error.
 | `--fail-on error\|warning` | Minimum severity that yields exit code `1` |
 | `--exclude PATTERN` | Extra glob (repeatable) |
 | `--disable RULE_ID` | Turn off a rule (repeatable) |
-| `--shrink-threshold 40` | Percent shrinkage that triggers NE101 |
+| `--shrink-threshold 40` | Percent shrinkage that triggers NE101 (integer 0–100) |
 | `--verbose` | Progress on stderr |
+
+Invalid CLI flags or invalid `[tool.noellipsis]` values print a clear error and exit `2`.
 
 ### Exit codes
 
@@ -88,13 +112,13 @@ Outside a repository the command exits `2` with a clear error.
 | --- | --- |
 | `0` | Nothing at or above `--fail-on` |
 | `1` | One or more findings at or above the threshold |
-| `2` | Invalid arguments, unreadable path, not a git repo, or internal error |
+| `2` | Invalid arguments, invalid config, unreadable path, not a git repo, or internal error |
 
 ## Rules
 
 | ID | Default | What it catches |
 | --- | --- | --- |
-| **NE001** | error | Placeholder phrases (`Rest of code unchanged`, `Insert your code here`, stub-like `TODO`/`FIXME`) |
+| **NE001** | error | Placeholder phrases in **real comments** (`Rest of code unchanged`, `Insert your code here`, stub-like `TODO`/`FIXME`) |
 | **NE002** | error | Bare ellipsis / incomplete body. A Python function whose **entire** body is `...` is an error |
 | **NE003** | warning | `pass`-only (or `raise NotImplementedError`-only) function, unless abstract or clearly intentional |
 | **NE004** | error | Unclosed Markdown code fence |
@@ -116,12 +140,15 @@ These are regression-tested:
 - `const copy = [...items];` and `function collect(...args) {}`
 - Prose such as `Wait... what happened?`
 - URLs and quoted documentation
+- Placeholder-looking text inside docstrings, JS/TS templates, Go raw strings, Rust raw strings, and shell heredocs
 - Intentional Python `@abstractmethod` / `Protocol` stubs
 - `.pyi` stub files
 - Empty constructors (`def __init__(self): pass`)
 - JavaScript spread / rest (`...args`)
 
 Language support: **strong AST for Python**. Conservative heuristics for JS/TS/JSX/TSX, Java, Go, Rust, C/C++, C#, Ruby, PHP, Shell, and Markdown. Prefer a miss over a false positive.
+
+A shared lexer classifies **code / string / comment** regions. Suppression phrases and placeholder detection look at comments only. The tool never executes scanned code.
 
 ## Configuration
 
@@ -135,11 +162,11 @@ exclude = ["vendor/**", "generated/**"]
 disable = ["NE103"]
 ```
 
-CLI flags override the file.
+See `noellipsis.example.toml`. CLI flags override the file.
 
 ## Suppressions
 
-Works in `#`, `//`, `/* */`, `<!-- -->`, and other comment styles:
+Works in real comments (`#`, `//`, `/* */`, `<!-- -->`). Phrases inside strings or docstrings never suppress.
 
 ```python
 def experimental():
@@ -152,6 +179,31 @@ def experimental():
 
 Multiple ids: `noellipsis: ignore[NE002,NE003]`.
 
+## pre-commit
+
+```yaml
+repos:
+  - repo: https://github.com/hoodbroskillson/NoEllipsis
+    rev: v1.0.0
+    hooks:
+      - id: noellipsis
+```
+
+The hook runs `noellipsis git-diff --staged` with no filename arguments and does not mutate Git. Exit codes match the table above.
+
+## GitHub Actions
+
+```yaml
+- uses: actions/checkout@v4
+- uses: actions/setup-python@v5
+  with:
+    python-version: "3.12"
+- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.0.0"
+- run: noellipsis git-diff --format github
+```
+
+This repository’s own CI is `.github/workflows/ci.yml`. Releases from `v*.*.*` tags attach a wheel and sdist on GitHub; they are **not** published to PyPI.
+
 ## Output
 
 Text:
@@ -159,22 +211,34 @@ Text:
 ```
 src/example.py:84:5 ERROR NE002 Bare ellipsis used as function body
   Replace the placeholder with an implementation or suppress NE002 if intentional.
+1 finding: 1 error
 ```
 
-GitHub Actions:
+A clean scan prints `No issues found.`
+
+GitHub Actions (special characters in paths and messages are escaped):
 
 ```
 ::error file=src/example.py,line=84,col=5::NE002 Bare ellipsis used as function body
 ```
 
-JSON is stable (sorted keys, findings ordered by file / line / rule).
+JSON is deterministic (sorted keys, findings ordered by file / line / rule).
 
-## Safety
+## Limitations (honest)
 
-- No network requests
+- Not a type checker, compiler, formatter, or security scanner.
+- Not an AI-content detector and will not tell you whether a human wrote a file.
+- Heuristics for non-Python languages miss some syntax and ignore some comments inside unusual constructs.
+- `--shrink-threshold` compare is byte-size based; a shorter-but-complete rewrite can still trip NE101.
+- False positives should be reported as issues with a minimal file. Prefer a suppression over loosening a rule globally.
+
+## Safety / privacy
+
+- No network requests at runtime
 - No evaluation or `exec` of scanned files
 - Scanned files are never modified
 - Git is read-only (`git rev-parse`, `git diff`)
+- Runs entirely on the machine you invoke it on
 
 ## License
 
