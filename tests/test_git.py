@@ -5,7 +5,7 @@ from pathlib import Path
 
 from noellipsis.cli import main
 from noellipsis.config import Config
-from noellipsis.git import GitError, parse_diff, require_repo, scan_git_diff
+from noellipsis.git import GitError, parse_diff, parse_diff_details, require_repo, scan_git_diff
 
 
 def _git(args: list[str], cwd: Path) -> None:
@@ -70,3 +70,35 @@ def test_require_repo_error(tmp_path: Path) -> None:
         raise AssertionError("expected GitError")
     except GitError as exc:
         assert "git" in exc.message.lower() or "not" in exc.message.lower()
+
+
+
+def test_parse_diff_keeps_old_path_on_rename() -> None:
+    diff = """diff --git a/old.js b/new.js
+similarity index 90%
+rename from old.js
+rename to new.js
+--- a/old.js
++++ b/new.js
+@@ -3,0 +4 @@
++// note
+"""
+    files = parse_diff_details(diff)
+    assert len(files) == 1
+    assert files[0].path == "new.js"
+    assert files[0].old_path == "old.js"
+
+
+def test_git_diff_rename_keeps_preexisting_unbalance(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "old.js"
+    target.write_text("function f() {\n  return foo(\n}\n", encoding="utf-8")
+    _git(["add", "old.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    _git(["mv", "old.js", "new.js"], tmp_path)
+    renamed = tmp_path / "new.js"
+    renamed.write_text("function f() {\n  return foo(\n}\n// note\n", encoding="utf-8")
+    _git(["add", "new.js"], tmp_path)
+    result = scan_git_diff(Config(), staged=True, cwd=tmp_path)
+    assert not any(f.rule_id == "NE005" for f in result.findings)

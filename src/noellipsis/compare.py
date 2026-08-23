@@ -22,12 +22,12 @@ def compare_files(generated: Path, original: Path, config: Config) -> ScanResult
     result = ScanResult()
     try:
         gen_text = generated.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         result.errors.append(f"Unreadable file: {generated}: {exc}")
         return result
     try:
         orig_text = original.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         result.errors.append(f"Unreadable file: {original}: {exc}")
         return result
 

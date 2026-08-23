@@ -54,3 +54,24 @@ def test_unreadable_compare(tmp_path: Path) -> None:
     original.write_text("x = 1\n", encoding="utf-8")
     result = compare_files(tmp_path / "missing.py", original, Config())
     assert result.errors
+
+
+
+def test_compare_latin1_generated_is_error_not_crash(tmp_path: Path) -> None:
+    original = tmp_path / "o.py"
+    generated = tmp_path / "g.py"
+    original.write_text("x = 1\n", encoding="utf-8")
+    generated.write_bytes(b"x = '\xe9'\n")
+    result = compare_files(generated, original, Config())
+    assert result.errors
+    assert not result.findings
+
+
+def test_compare_latin1_original_is_error_not_crash(tmp_path: Path) -> None:
+    original = tmp_path / "o.py"
+    generated = tmp_path / "g.py"
+    generated.write_text("x = 1\n", encoding="utf-8")
+    original.write_bytes(b"x = '\xe9'\n")
+    result = compare_files(generated, original, Config())
+    assert result.errors
+    assert not result.findings

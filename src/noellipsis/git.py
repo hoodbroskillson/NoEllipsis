@@ -47,6 +47,7 @@ class DiffFile:
     added_text: str
     added_lines: set[int] = field(default_factory=set)
     is_new: bool = False
+    old_path: str | None = None
     hunks: list[list[tuple[int, str]]] = field(default_factory=list)
 
 
@@ -91,6 +92,8 @@ def scan_git_diff(config: Config, *, staged: bool = False, cwd: Path | None = No
                 if not on_added and not is_new:
                     if pre_ids is None:
                         prior = _git_blob(root, f"HEAD:{rel_path}")
+                        if prior is None and patch.old_path and patch.old_path != rel_path:
+                            prior = _git_blob(root, f"HEAD:{patch.old_path}")
                         pre_ids = (
                             set()
                             if prior is None
@@ -158,6 +161,7 @@ def parse_diff_details(diff_text: str) -> list[DiffFile]:
     new_line = 0
     hunk: list[tuple[int, str]] | None = None
     pending_new = False
+    pending_old: str | None = None
     for raw in diff_text.splitlines():
         if raw.startswith("diff --git "):
             if current is not None and hunk:
@@ -165,9 +169,19 @@ def parse_diff_details(diff_text: str) -> list[DiffFile]:
             current = None
             hunk = None
             pending_new = False
+            pending_old = None
+            continue
+        if raw.startswith("rename from "):
+            renamed = raw[len("rename from "):].strip()
+            if renamed.startswith('"'):
+                renamed = _c_unquote(renamed)
+            pending_old = renamed
             continue
         if raw.startswith("--- "):
-            pending_new = _decode_git_path(raw[4:]) is None
+            decoded_old = _decode_git_path(raw[4:])
+            pending_new = decoded_old is None
+            if decoded_old is not None:
+                pending_old = decoded_old
             continue
         if raw.startswith("+++ "):
             decoded = _decode_git_path(raw[4:])
@@ -176,10 +190,14 @@ def parse_diff_details(diff_text: str) -> list[DiffFile]:
                 continue
             current = files.get(decoded)
             if current is None:
-                current = DiffFile(path=decoded, added_text="", is_new=pending_new)
+                current = DiffFile(
+                    path=decoded, added_text="", is_new=pending_new, old_path=pending_old
+                )
                 files[decoded] = current
             else:
                 current.is_new = current.is_new or pending_new
+                if pending_old and not current.old_path:
+                    current.old_path = pending_old
             continue
         header = _HUNK.match(raw)
         if header and current is not None:
