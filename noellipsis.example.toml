@@ -1,9 +1,11 @@
 # Copy the table below into your project's pyproject.toml
-# or keep this file as a reference.
+# or pass this file with --config PATH.
 #
 # shrink-threshold is an integer 0-100.
 # fail-on is "error" or "warning".
 # Invalid values make the CLI exit 2.
+# An explicit --config file is required to exist and parse;
+# there is no silent fallback to pyproject.toml or defaults.
 
 [tool.noellipsis]
 shrink-threshold = 40

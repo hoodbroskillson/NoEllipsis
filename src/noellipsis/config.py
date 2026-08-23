@@ -89,9 +89,48 @@ def _parse_threshold(value: object, *, source: str) -> int:
     return threshold_i
 
 
+def _config_from_tool(tool: dict, *, source: str) -> Config:
+    extras = _as_str_list(tool.get("exclude"))
+    disable = _as_str_list(tool.get("disable"))
+    threshold = tool.get("shrink-threshold", tool.get("shrink_threshold", 40))
+    fail_on = str(tool.get("fail-on", tool.get("fail_on", "error")))
+    threshold_i = _parse_threshold(threshold, source=source)
+    if fail_on not in {"error", "warning"}:
+        raise ConfigError(f"{source}: fail-on must be 'error' or 'warning'")
+    return replace(
+        Config(),
+        shrink_threshold=threshold_i,
+        fail_on=fail_on,
+        exclude=list(DEFAULT_EXCLUDES) + extras,
+        disable=disable,
+    )
+
+
+def load_config_file(path: Path) -> Config:
+    """Load an explicit TOML file that must contain [tool.noellipsis].
+
+    Missing, unreadable, malformed, or invalid files raise ConfigError.
+    There is no silent fallback to defaults or to pyproject.toml.
+    """
+    candidate = Path(path)
+    if not candidate.is_file():
+        raise ConfigError(f"config file does not exist: {candidate}")
+    try:
+        raw = candidate.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(f"cannot read config file {candidate}: {exc}") from exc
+    try:
+        data = tomllib.loads(raw)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"invalid TOML in {candidate}: {exc}") from exc
+    tool = data.get("tool", {}).get("noellipsis") if isinstance(data, dict) else None
+    if not isinstance(tool, dict):
+        raise ConfigError(f"{candidate}: missing [tool.noellipsis] table")
+    return _config_from_tool(tool, source=str(candidate))
+
+
 def load_pyproject(start: Path | None = None) -> Config:
     """Walk upward from *start* (or cwd) looking for [tool.noellipsis]."""
-    cfg = Config()
     directory = (start or Path.cwd()).resolve()
     if directory.is_file():
         directory = directory.parent
@@ -112,21 +151,8 @@ def load_pyproject(start: Path | None = None) -> Config:
             if folder == directory:
                 continue
             break
-        extras = _as_str_list(tool.get("exclude"))
-        disable = _as_str_list(tool.get("disable"))
-        threshold = tool.get("shrink-threshold", tool.get("shrink_threshold", cfg.shrink_threshold))
-        fail_on = str(tool.get("fail-on", tool.get("fail_on", cfg.fail_on)))
-        threshold_i = _parse_threshold(threshold, source=str(candidate))
-        if fail_on not in {"error", "warning"}:
-            raise ConfigError(f"{candidate}: fail-on must be 'error' or 'warning'")
-        return replace(
-            cfg,
-            shrink_threshold=threshold_i,
-            fail_on=fail_on,
-            exclude=list(DEFAULT_EXCLUDES) + extras,
-            disable=disable,
-        )
-    return cfg
+        return _config_from_tool(tool, source=str(candidate))
+    return Config()
 
 
 def apply_cli_overrides(

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from noellipsis import __version__
 from noellipsis.compare import compare_files
-from noellipsis.config import ConfigError, apply_cli_overrides, load_pyproject
+from noellipsis.config import ConfigError, apply_cli_overrides, load_config_file, load_pyproject
 from noellipsis.formatters import format_result, format_rules
 from noellipsis.git import GitError, scan_git_diff
 from noellipsis.models import ScanResult
@@ -21,6 +21,7 @@ _SHARED_VALUE = {
     "--exclude",
     "--disable",
     "--shrink-threshold",
+    "--config",
 }
 _SHARED_FLAGS = {"--verbose"}
 
@@ -107,6 +108,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Percent size reduction that triggers NE101 (0-100, default: 40)",
     )
     parser.add_argument("--verbose", action="store_true", help="Print scan progress on stderr")
+    parser.add_argument(
+        "--config",
+        default=None,
+        metavar="PATH",
+        help="TOML file with a [tool.noellipsis] table (overrides auto-discovered pyproject.toml)",
+    )
 
     sub = parser.add_subparsers(dest="command")
 
@@ -177,8 +184,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         start = Path(args.generated)
 
     try:
+        if args.config:
+            base = load_config_file(Path(args.config))
+        else:
+            base = load_pyproject(start if start.exists() else Path.cwd())
         cfg = apply_cli_overrides(
-            load_pyproject(start if start.exists() else Path.cwd()),
+            base,
             output_format=args.output_format,
             fail_on=args.fail_on,
             exclude=args.exclude,

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noellipsis"
-version = "1.1.0"
+version = "1.1.1"
 description = "Detect incomplete or dangerously truncated LLM-generated code before paste, commit, or deploy."
 readme = "README.md"
 license = "MIT"
@@ -55,7 +55,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=noellipsis --cov-report=term-missing --cov-fail-under=90"
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
 [tool.coverage.run]
 source = ["src/noellipsis"]
@@ -71,7 +71,7 @@ exclude_lines = [
 line-length = 120
 target-version = "py311"
 src = ["src", "tests"]
-exclude = ["examples", ".venv", "tests/fixtures"]
+exclude = ["examples", ".venv", "tests/fixtures", "evals/corpus"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
