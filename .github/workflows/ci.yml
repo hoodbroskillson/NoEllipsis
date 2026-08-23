@@ -14,12 +14,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Install
         run: python -m pip install -e ".[dev]"
       - name: Ruff
@@ -30,12 +31,53 @@ jobs:
         run: python -m build
       - name: Twine
         run: python -m twine check dist/*
+      - name: Wheel metadata has no runtime Requires-Dist
+        run: |
+          python - <<'PY'
+          import tarfile, zipfile
+          from pathlib import Path
+          wheels = list(Path("dist").glob("*.whl"))
+          assert wheels, "no wheel"
+          with zipfile.ZipFile(wheels[0]) as zf:
+              meta = next(n for n in zf.namelist() if n.endswith("METADATA"))
+              text = zf.read(meta).decode()
+          runtime = [line for line in text.splitlines() if line.startswith("Requires-Dist:") and "extra ==" not in line]
+          assert runtime == [], runtime
+          print("wheel runtime Requires-Dist: none")
+          PY
+      - name: Wheel and sdist smoke
+        run: |
+          python -m pip install dist/*.whl
+          noellipsis --version
+          noellipsis rules --format json
+          noellipsis check src
+          noellipsis check examples --format text || true
+          noellipsis check examples --format json | python -c "import json,sys; json.load(sys.stdin)"
+          noellipsis check examples --format github || true
+          noellipsis check examples --format sarif | python -c "import json,sys; json.load(sys.stdin)"
+          noellipsis --format json check examples >/tmp/a.json || true
+          noellipsis check examples --format json >/tmp/b.json || true
+          python -c "from pathlib import Path; assert Path('/tmp/a.json').read_text()==Path('/tmp/b.json').read_text()"
+          python -m pip uninstall -y noellipsis
+          python -m pip install dist/*.tar.gz
+          noellipsis --version
+      - name: pre-commit hook manifest
+        run: python -c "import yaml,sys; print('skip-if-no-yaml')" || true
+        continue-on-error: true
+      - name: Validate pre-commit hook yaml
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path(".pre-commit-hooks.yaml").read_text()
+          assert "id: noellipsis" in text
+          print("pre-commit hook manifest ok")
+          PY
 
   test-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install
@@ -52,8 +94,8 @@ jobs:
   test-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install
@@ -66,3 +108,26 @@ jobs:
         run: python -m build
       - name: Twine
         run: python -m twine check dist/*
+
+  action-self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Action on clean fixtures
+        uses: ./
+        with:
+          path: tests/fixtures/should_not_flag
+          command: check
+          fail-on: error
+          format: text
+      - name: Action on dirty fixtures (expect findings)
+        id: dirty
+        continue-on-error: true
+        uses: ./
+        with:
+          path: tests/fixtures/should_flag
+          command: check
+          fail-on: error
+          format: json
+      - name: Dirty fixtures must fail
+        run: test "${{ steps.dirty.outcome }}" = "failure"

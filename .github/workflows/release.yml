@@ -5,18 +5,24 @@ on:
     tags:
       - "v*.*.*"
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Verify tag matches pyproject version
+        id: version
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME#v}"
@@ -25,18 +31,67 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match pyproject version $VERSION"
             exit 1
           fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Install
         run: python -m pip install -e ".[dev]"
       - name: Ruff
         run: ruff check .
       - name: Tests
         run: pytest -q
-      - name: Build
+      - name: Build once
         run: python -m build
       - name: Twine
         run: python -m twine check dist/*
-      - name: Create GitHub release
+      - name: SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum *.whl *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+      - name: Upload the same bytes
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-package-distributions
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+      - name: Create GitHub release with the same artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --title "$GITHUB_REF_NAME"
+          set -euo pipefail
+          NOTES="docs/release-notes-1.1.0.md"
+          if [ -f "$NOTES" ]; then
+            gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --title "$GITHUB_REF_NAME" --notes-file "$NOTES"
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --generate-notes --title "$GITHUB_REF_NAME"
+          fi
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download the same build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: python-package-distributions
+          path: dist
+      - name: Isolate wheel and sdist for PyPI
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          mv dist/*.whl dist/*.tar.gz publish/
+      - name: Publish to PyPI (Trusted Publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: publish
