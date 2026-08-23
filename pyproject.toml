@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Detect incomplete or dangerously truncated LLM-generated code before paste, commit, or deploy."
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "James Schmidt" }]
+authors = [{ name = "hoodbroskillson" }]
 requires-python = ">=3.11"
 keywords = ["llm", "code-review", "cli", "static-analysis", "placeholders"]
 classifiers = [

@@ -178,4 +178,4 @@ JSON is stable (sorted keys, findings ordered by file / line / rule).
 
 ## License
 
-MIT © 2026 James Schmidt
+MIT © 2026 hoodbroskillson
