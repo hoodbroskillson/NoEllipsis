@@ -330,7 +330,7 @@ def _c_unquote(value: str) -> str:
             continue
         out.extend(nxt.encode("utf-8"))
         i += 2
-    return out.decode("utf-8")
+    return out.decode("utf-8", errors="replace")
 
 
 def _decode_git_path(rest: str) -> str | None:

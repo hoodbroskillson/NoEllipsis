@@ -357,3 +357,11 @@ def test_git_scan_missing_on_disk(tmp_path: Path) -> None:
     assert extra2 == []
     empty = _ellipsis_only_hunks(tmp_path / "gone.py", DiffFile("x.py", "", hunks=[[(1, "   ")]]), [])
     assert empty == []
+
+
+def test_c_unquote_latin1_octal_does_not_raise() -> None:
+    from noellipsis.git import _c_unquote
+    # git C-quote for a single 0xe9 byte is \\351
+    got = _c_unquote(chr(34) + "\\351.js" + chr(34))
+    assert got.endswith(".js")
+    assert "\351" not in got
