@@ -41,7 +41,7 @@ python -m pip install noellipsis
 From the git tag (same version):
 
 ```bash
-python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
+python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.1"
 ```
 
 Then:
@@ -121,8 +121,9 @@ noellipsis rules --format json
 | `--disable RULE_ID` | Turn off a rule (repeatable) |
 | `--shrink-threshold 40` | Percent shrinkage that triggers NE101 (integer 0–100) |
 | `--verbose` | Progress on stderr |
+| `--config PATH` | TOML file with `[tool.noellipsis]` (overrides auto-discovered `pyproject.toml`) |
 
-Invalid CLI flags or invalid `[tool.noellipsis]` values print a clear error and exit `2`.
+Invalid CLI flags or invalid `[tool.noellipsis]` values print a clear error and exit `2`. An explicit `--config` that is missing, unreadable, malformed, or invalid also exits `2` (no silent fallback).
 
 ### Exit codes
 
@@ -180,7 +181,12 @@ exclude = ["vendor/**", "generated/**"]
 disable = ["NE103"]
 ```
 
-See `noellipsis.example.toml`. CLI flags override the file.
+See `noellipsis.example.toml`. An explicit `--config PATH` wins over `pyproject.toml`. CLI flags override both.
+
+```bash
+noellipsis --config noellipsis.example.toml check src
+noellipsis check src --config noellipsis.example.toml
+```
 
 ## Suppressions
 
@@ -202,7 +208,7 @@ Multiple ids: `noellipsis: ignore[NE002,NE003]`.
 ```yaml
 repos:
   - repo: https://github.com/hoodbroskillson/NoEllipsis
-    rev: v1.1.0
+    rev: v1.1.1
     hooks:
       - id: noellipsis
 ```
@@ -212,18 +218,18 @@ The hook runs `noellipsis git-diff --staged` with no filename arguments and does
 ## GitHub Actions
 
 ```yaml
-- uses: actions/checkout@v4
-- uses: actions/setup-python@v5
+- uses: actions/checkout@v7
+- uses: actions/setup-python@v7
   with:
     python-version: "3.12"
-- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
+- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.1"
 - run: noellipsis git-diff --format github
 ```
 
 Reusable action (exact tag, never a floating `v1`):
 
 ```yaml
-- uses: hoodbroskillson/NoEllipsis@v1.1.0
+- uses: hoodbroskillson/NoEllipsis@v1.1.1
   with:
     path: .
     command: check
@@ -231,7 +237,26 @@ Reusable action (exact tag, never a floating `v1`):
     fail-on: error
 ```
 
-See `action/README.md`. SARIF upload example: `.github/workflows/noellipsis-sarif.yml` (`contents: read`, `security-events: write`, `github/codeql-action/upload-sarif@v4`).
+SARIF upload (file is written even when the scanner exits 1; fail after upload):
+
+```yaml
+- uses: actions/checkout@v7
+- uses: hoodbroskillson/NoEllipsis@v1.1.1
+  id: scan
+  continue-on-error: true
+  with:
+    command: check
+    path: src
+    format: sarif
+- uses: github/codeql-action/upload-sarif@v4
+  if: always()
+  with:
+    sarif_file: ${{ steps.scan.outputs.sarif-file }}
+- name: Fail if findings
+  run: test "${{ steps.scan.outputs.exit-code }}" = "0"
+```
+
+See `action/README.md`. Also `.github/workflows/noellipsis-sarif.yml` (`contents: read`, `security-events: write`).
 
 This repository’s own CI is `.github/workflows/ci.yml`. The `release.yml` workflow builds once, checksums and attests artifacts, attaches the same bytes to the GitHub Release, and is prepared to publish to PyPI via Trusted Publisher (`environment: pypi`). Do not publish from a laptop.
 

@@ -2,6 +2,8 @@
 
 Local static checker for incomplete or truncated LLM-generated code. Still zero runtime dependencies. Still no network, telemetry, or rewrite.
 
+NoEllipsis 1.1.0 **is on PyPI**: https://pypi.org/project/noellipsis/
+
 ## Highlights
 
 - **SARIF 2.1.0** (`--format sarif`) for GitHub code scanning
@@ -13,13 +15,16 @@ Local static checker for incomplete or truncated LLM-generated code. Still zero 
 
 ## Install
 
-Until the first PyPI upload, install from the git tag:
+```bash
+pipx install noellipsis
+python -m pip install noellipsis
+```
+
+From the git tag (same version):
 
 ```bash
 python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
 ```
-
-After publish, `pipx install noellipsis` / `pip install noellipsis` will work. There is no PyPI badge yet.
 
 ## SARIF
 
@@ -52,19 +57,23 @@ Requires Python 3.11+. Tested on 3.11, 3.12, 3.13, and 3.14.
 
 ## Checksums and provenance
 
-Release assets include the wheel, sdist, and `SHA256SUMS`. GitHub artifact attestations are produced by `actions/attest-build-provenance@v3` on the release workflow. Verify checksums after download; do not trust a wheel copied from an unattested machine.
-
-Checksum placeholders (filled by `release.yml` at tag time):
+Release assets include the wheel, sdist, and `SHA256SUMS`. GitHub artifact attestations were produced on the 1.1.0 release workflow.
 
 ```
-<sha256>  noellipsis-1.1.0-py3-none-any.whl
-<sha256>  noellipsis-1.1.0.tar.gz
+06d10994dabc7658247a07fbf362f743f5a242577c7ba69ef5d7a13d35926a84  noellipsis-1.1.0-py3-none-any.whl
+154ec70778eed56725118c768cab0d5bed00c8b69264306d928ab546aa6b96b3  noellipsis-1.1.0.tar.gz
+```
+
+Verify a downloaded wheel:
+
+```bash
+gh attestation verify noellipsis-1.1.0-py3-none-any.whl --repo hoodbroskillson/NoEllipsis
 ```
 
 ## Upgrade
 
 ```bash
-python -m pip install --upgrade "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
+python -m pip install --upgrade noellipsis
 ```
 
 pre-commit consumers should set `rev: v1.1.0`.

@@ -36,7 +36,7 @@ Python 3.11+ is required. CI runs 3.11–3.14 on Ubuntu, plus Windows and macOS 
 
 ## Release checklist
 
-1. Version is `1.1.0` (or the next semver) in `pyproject.toml` and `src/noellipsis/__init__.py`.
+1. Version is `1.1.1` (or the next semver) in `pyproject.toml` and `src/noellipsis/__init__.py`.
 2. `CHANGELOG.md` has a dated section.
 3. `ruff check .` and `pytest -q` pass; coverage stays at or above 90%.
 4. `python -m build && python -m twine check dist/*` (from the `dev` or `release` extra).

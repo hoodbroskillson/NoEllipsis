@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-08-23
+
+### Added
+- GitHub Action writes validated SARIF 2.1.0 bytes to `sarif-file` (default `noellipsis.sarif`) and exposes `sarif-file` / `exit-code` outputs.
+- Real `--config PATH` (before or after the subcommand). Explicit file wins over `pyproject.toml`; CLI flags still win over the file. Missing, unreadable, malformed, or invalid config exits `2` with no silent fallback.
+- Version-aware release-notes renderer (`scripts/render_release_notes.py`) that injects `SHA256SUMS` into `docs/release-notes-<version>.md`.
+- Curated (not real-world) regression corpus under `evals/` with committed TP/FP/TN/FN expectations.
+
+### Fixed
+- Action `command` / `mode` alias: empty defaults, prefer nonempty `command`, then `mode`, then `check`. Conflicting values fail clearly.
+- Historical `docs/release-notes-1.1.0.md` now records that 1.1.0 is on PyPI, with real checksums and `gh attestation verify`.
+- CI pre-commit job actually runs `validate-manifest` and `try-repo` (no `|| true` / string-only checks) and a throwaway consumer repo whose installed hook fails on a staged incomplete file.
+
+### Changed
+- Action and README examples pin `hoodbroskillson/NoEllipsis@v1.1.1`.
+- Release workflow attests with `actions/attest-build-provenance@v4` and fails if versioned notes are missing.
+
+[1.1.1]: https://github.com/hoodbroskillson/NoEllipsis/releases/tag/v1.1.1
+
 ## [1.1.0] - 2026-08-23
 
 ### Added
