@@ -1,4 +1,4 @@
-# NoEllipsis 1.1.1
+# NoEllipsis 1.1.2
 
 Patch release. Still zero runtime dependencies. Still no network, telemetry, or rewrite. Published on PyPI: https://pypi.org/project/noellipsis/
 
@@ -18,13 +18,13 @@ pipx install noellipsis
 python -m pip install noellipsis
 ```
 
-Pin the action and pre-commit hook to `v1.1.1`.
+Pin the action and pre-commit hook to `v1.1.2`.
 
 ## Action SARIF upload
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: hoodbroskillson/NoEllipsis@v1.1.1
+- uses: hoodbroskillson/NoEllipsis@v1.1.2
   id: scan
   continue-on-error: true
   with:
@@ -50,7 +50,7 @@ Release assets include the wheel, sdist, and `SHA256SUMS`. Attestations use `act
 Verify:
 
 ```bash
-gh attestation verify noellipsis-1.1.1-py3-none-any.whl --repo hoodbroskillson/NoEllipsis
+gh attestation verify noellipsis-1.1.2-py3-none-any.whl --repo hoodbroskillson/NoEllipsis
 ```
 
 ## Compatibility

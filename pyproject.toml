@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noellipsis"
-version = "1.1.1"
+version = "1.1.2"
 description = "Detect incomplete or dangerously truncated LLM-generated code before paste, commit, or deploy."
 readme = "README.md"
 license = "MIT"

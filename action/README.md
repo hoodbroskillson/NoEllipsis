@@ -3,7 +3,7 @@
 Pin the exact tag. Do **not** use a floating `v1` tag.
 
 ```yaml
-- uses: hoodbroskillson/NoEllipsis@v1.1.1
+- uses: hoodbroskillson/NoEllipsis@v1.1.2
   with:
     path: .
     command: check
@@ -51,7 +51,7 @@ When `format` is `sarif`, stdout is captured, validated as JSON with `version` `
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: hoodbroskillson/NoEllipsis@v1.1.1
+- uses: hoodbroskillson/NoEllipsis@v1.1.2
   id: scan
   continue-on-error: true
   with:

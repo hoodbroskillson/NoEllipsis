@@ -26,4 +26,4 @@ See `.github/workflows/noellipsis-sarif.yml`:
 3. `github/codeql-action/upload-sarif@v4`
 4. fail the job if the scanner exit was not `0`
 
-Reusable action pin: `hoodbroskillson/NoEllipsis@v1.1.1` (no floating `v1`).
+Reusable action pin: `hoodbroskillson/NoEllipsis@v1.1.2` (no floating `v1`).

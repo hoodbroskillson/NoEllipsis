@@ -41,7 +41,7 @@ python -m pip install noellipsis
 From the git tag (same version):
 
 ```bash
-python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.1"
+python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.2"
 ```
 
 Then:
@@ -208,7 +208,7 @@ Multiple ids: `noellipsis: ignore[NE002,NE003]`.
 ```yaml
 repos:
   - repo: https://github.com/hoodbroskillson/NoEllipsis
-    rev: v1.1.1
+    rev: v1.1.2
     hooks:
       - id: noellipsis
 ```
@@ -222,14 +222,14 @@ The hook runs `noellipsis git-diff --staged` with no filename arguments and does
 - uses: actions/setup-python@v7
   with:
     python-version: "3.12"
-- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.1"
+- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.2"
 - run: noellipsis git-diff --format github
 ```
 
 Reusable action (exact tag, never a floating `v1`):
 
 ```yaml
-- uses: hoodbroskillson/NoEllipsis@v1.1.1
+- uses: hoodbroskillson/NoEllipsis@v1.1.2
   with:
     path: .
     command: check
@@ -241,7 +241,7 @@ SARIF upload (file is written even when the scanner exits 1; fail after upload):
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: hoodbroskillson/NoEllipsis@v1.1.1
+- uses: hoodbroskillson/NoEllipsis@v1.1.2
   id: scan
   continue-on-error: true
   with:
