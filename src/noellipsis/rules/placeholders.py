@@ -30,13 +30,60 @@ class PhraseHit:
     snippet: str
 
 
-def find_placeholder_hits(text: str) -> list[PhraseHit]:
+def _comment_start(line: str) -> int | None:
+    """Index where a comment begins, or None. Strings are not comments."""
+    i = 0
+    n = len(line)
+    quote: str | None = None
+    while i < n:
+        ch = line[i]
+        if quote:
+            if ch == "\\" and quote in {"'", '"', "`"}:
+                i += 2
+                continue
+            if line.startswith(quote, i):
+                i += len(quote)
+                quote = None
+                continue
+            i += 1
+            continue
+        if line.startswith(('"""', "'''"), i):
+            quote = line[i : i + 3]
+            i += 3
+            continue
+        if ch in {"'", '"', "`"}:
+            quote = ch
+            i += 1
+            continue
+        if ch == "#":
+            return i
+        if line.startswith("//", i) or line.startswith("/*", i):
+            return i
+        if line.startswith("<!--", i):
+            return i
+        i += 1
+    return None
+
+
+def find_placeholder_hits(text: str, *, language: str = "") -> list[PhraseHit]:
+    """Flag placeholder phrases only in comments, not quoted documentation."""
+    del language  # reserved: comment detection is language-agnostic enough
     hits: list[PhraseHit] = []
     for lineno, line in enumerate(text.splitlines(), start=1):
+        cstart = _comment_start(line)
+        if cstart is None:
+            continue
+        region = line[cstart:]
         for pat in _PHRASE_RES:
-            match = pat.search(line)
+            match = pat.search(region)
             if match:
-                hits.append(PhraseHit(line=lineno, column=match.start() + 1, snippet=match.group(0)))
+                hits.append(
+                    PhraseHit(
+                        line=lineno,
+                        column=cstart + match.start() + 1,
+                        snippet=match.group(0),
+                    )
+                )
                 break
     return hits
 

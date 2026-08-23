@@ -91,8 +91,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _exit_from(result: ScanResult, fail_on: str) -> int:
-    if result.errors:
-        return 2
     if any(f.at_or_above(fail_on) for f in result.findings):
         return 1
     return 0
@@ -169,16 +167,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: internal error: {exc}", file=sys.stderr)
         return 2
 
-    if result.errors and not result.findings:
-        for err in result.errors:
-            print(f"error: {err}", file=sys.stderr)
+    for err in result.errors:
+        print(f"error: {err}", file=sys.stderr)
+
+    if result.errors and result.files_scanned == 0 and not result.findings:
         return 2
 
     sys.stdout.write(format_result(result, cfg.output_format))
-    if result.errors:
-        for err in result.errors:
-            print(f"error: {err}", file=sys.stderr)
-        return 2
     return _exit_from(result, cfg.fail_on)
 
 

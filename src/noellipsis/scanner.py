@@ -92,8 +92,9 @@ class FileContext:
 
 
 class Scanner:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, *, root: Path | None = None) -> None:
         self.config = config
+        self.root = root
         self._python = PythonRules()
         self._generic = GenericRules()
         self._markdown = MarkdownRules()
@@ -103,6 +104,7 @@ class Scanner:
         if not target.exists():
             result.errors.append(f"Path does not exist: {target}")
             return result
+        self.root = target.resolve() if target.is_dir() else target.resolve().parent
         files = list(self._iter_files(target))
         for path in files:
             try:
@@ -125,7 +127,7 @@ class Scanner:
             path.suffix.lower() in {".js", ".mjs"} and looks_minified(text)
         ):
             return []
-        if SUPPRESS_FILE.search(text):
+        if _file_suppressed(text):
             return []
         findings: list[Finding] = []
         if language == "python":
@@ -146,6 +148,9 @@ class Scanner:
         except UnicodeDecodeError:
             text = data.decode("utf-8", errors="replace")
         return self.scan_text(path, text)
+
+    def filter_findings(self, path: Path, text: str, findings: list[Finding]) -> list[Finding]:
+        return self._filter(path, text, findings)
 
     def _filter(self, path: Path, text: str, findings: list[Finding]) -> list[Finding]:
         lines = text.splitlines()
@@ -177,28 +182,99 @@ class Scanner:
         return found
 
     def _excluded(self, path: Path) -> bool:
-        rel = _rel_posix(path)
-        name = path.name
-        for pattern in self.config.exclude:
-            if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(name, pattern):
-                return True
-            # directory-style "vendor/**" already covered; also match prefix dirs
-            if pattern.endswith("/**") and (
-                rel == pattern[:-3] or rel.startswith(pattern[:-3] + "/")
-            ):
-                return True
-        return False
+        return path_is_excluded(path, self.config, root=self.root)
 
 
 def language_for(path: Path) -> str | None:
     return EXTENSION_LANG.get(path.suffix.lower())
 
 
-def _rel_posix(path: Path) -> str:
+def _rel_posix(path: Path, root: Path | None = None) -> str:
     try:
-        return path.resolve().relative_to(Path.cwd().resolve()).as_posix()
-    except ValueError:
-        return path.as_posix()
+        resolved = path.resolve()
+    except OSError:
+        resolved = path
+    bases: list[Path] = []
+    if root is not None:
+        try:
+            bases.append(root.resolve())
+        except OSError:
+            bases.append(root)
+    try:
+        bases.append(Path.cwd().resolve())
+    except OSError:
+        bases.append(Path.cwd())
+    for base in bases:
+        try:
+            return resolved.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return path.as_posix()
+
+
+def path_is_excluded(path: Path, config: Config, *, root: Path | None = None) -> bool:
+    rel = _rel_posix(path, root)
+    name = path.name
+    parts = Path(rel).parts
+    if any(part in SKIP_DIR_NAMES for part in parts):
+        return True
+    for pattern in config.exclude:
+        if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(name, pattern):
+            return True
+        if pattern.endswith("/**") and (
+            rel == pattern[:-3] or rel.startswith(pattern[:-3] + "/")
+        ):
+            return True
+    return False
+
+
+def _comment_start(line: str) -> int | None:
+    i = 0
+    n = len(line)
+    quote: str | None = None
+    tq = chr(34) * 3
+    sq3 = chr(39) * 3
+    while i < n:
+        ch = line[i]
+        if quote:
+            if ch == "\\" and quote in {chr(39), chr(34), "`"}:
+                i += 2
+                continue
+            if line.startswith(quote, i):
+                i += len(quote)
+                quote = None
+                continue
+            i += 1
+            continue
+        if line.startswith((tq, sq3), i):
+            quote = line[i : i + 3]
+            i += 3
+            continue
+        if ch in {chr(39), chr(34), "`"}:
+            quote = ch
+            i += 1
+            continue
+        if ch == "#":
+            return i
+        if line.startswith("//", i) or line.startswith("/*", i):
+            return i
+        if line.startswith("<!--", i):
+            return i
+        i += 1
+    return None
+
+
+def _comment_text(line: str) -> str:
+    start = _comment_start(line)
+    return "" if start is None else line[start:]
+
+
+def _file_suppressed(text: str) -> bool:
+    for line in text.splitlines():
+        comment = _comment_text(line)
+        if comment and SUPPRESS_FILE.search(comment):
+            return True
+    return False
 
 
 def _line_suppressed(lines: list[str], line: int | None, rule_id: str) -> bool:
@@ -211,7 +287,10 @@ def _line_suppressed(lines: list[str], line: int | None, rule_id: str) -> bool:
             candidates.append(lines[idx])
     rid = rule_id.upper()
     for text in candidates:
-        match = SUPPRESS_LINE.search(text)
+        comment = _comment_text(text)
+        if not comment:
+            continue
+        match = SUPPRESS_LINE.search(comment)
         if not match:
             continue
         ids = {part.strip().upper() for part in match.group(1).split(",") if part.strip()}

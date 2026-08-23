@@ -250,3 +250,108 @@ def test_indented_snippet(tmp_path: Path) -> None:
     ids = {f.rule_id for f in compare_files(g, o, Config()).findings}
     assert "NE101" in ids
     assert "NE104" in ids
+
+
+def test_git_c_unquote_and_octal() -> None:
+    from noellipsis.git import _c_unquote, _decode_git_path, parse_diff_details
+
+    assert _c_unquote('"foo\\tbar"') == "foo\tbar"
+    assert _c_unquote('"oct\\141"') == "octa"
+    assert _c_unquote('"x\\q"') == "xq"
+    assert _decode_git_path("b/plain.py") == "plain.py"
+    diff = (
+        'diff --git a/x.py b/x.py\n'
+        '--- a/x.py\n'
+        '+++ b/x.py\n'
+        '@@ -1,0 +1,1 @@\n'
+        '+ok\n'
+        '\\ No newline at end of file\n'
+        '@@ -10,0 +11,1 @@\n'
+        '+more\n'
+    )
+    details = parse_diff_details(diff)
+    assert details[0].path == "x.py"
+    assert len(details[0].hunks) == 2
+
+
+def test_rust_raw_and_js_regex_class() -> None:
+    rust = 'fn main() { let s = r#" ( { [ "#; let t = r"brace {"; let u = [1, 2]; }\n'
+    assert scan_delimiters(rust, "rust") is None
+    js = "const re = /[a(]/; function ok() { return 1; }\n"
+    assert scan_delimiters(js, "javascript") is None
+    js2 = "const re = /\\(/; const x = 1;\n"
+    assert scan_delimiters(js2, "javascript") is None
+
+
+def test_scan_text_minified_and_null(tmp_path: Path) -> None:
+    assert Scanner(Config()).scan_text(tmp_path / "x.min.js", "function f(){...}") == []
+    assert Scanner(Config()).scan_text(tmp_path / "x.js", "x" * 5001 + "\n") == []
+    assert Scanner(Config()).scan_text(tmp_path / "x.py", "def f():\n    ...\n\x00") == []
+
+
+def test_scan_file_unreadable(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "x.py"
+    path.write_text("x = 1\n", encoding="utf-8")
+
+    def boom(self):
+        raise OSError("nope")
+
+    monkeypatch.setattr(Path, "read_bytes", boom)
+    result = Scanner(Config()).scan_path(path)
+    assert result.errors
+
+
+def test_cli_internal_and_oserror(tmp_path: Path, monkeypatch) -> None:
+    from noellipsis import cli as cli_mod
+
+    path = tmp_path / "x.py"
+    path.write_text("x = 1\n", encoding="utf-8")
+
+    def boom(*_a, **_k):
+        raise OSError("disk")
+
+    monkeypatch.setattr(cli_mod, "Scanner", type("S", (), {"__init__": lambda self, cfg: None, "scan_path": boom}))
+    assert main(["check", str(path)]) == 2
+
+    def boom2(*_a, **_k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli_mod, "Scanner", type("S", (), {"__init__": lambda self, cfg: None, "scan_path": boom2}))
+    assert main(["check", str(path)]) == 2
+
+
+def test_cli_errors_nothing_scannable(tmp_path: Path) -> None:
+    result_code = main(["check", str(tmp_path / "missing-dir")])
+    assert result_code == 2
+
+
+def test_python_attr_notimplemented_and_bases(tmp_path: Path) -> None:
+    text = (
+        "class E(Exception):\n"
+        "    pass\n"
+        "class C(foo.Bar):\n"
+        "    def run(self):\n"
+        "        raise builtins.NotImplementedError\n"
+        "    @foo.deco\n"
+        "    def other(self):\n"
+        "        return 1\n"
+    )
+    Scanner(Config()).scan_text(tmp_path / "x.py", text)
+
+
+def test_placeholders_escape_in_string() -> None:
+    from noellipsis.rules.placeholders import find_placeholder_hits
+
+    assert find_placeholder_hits('x = "Insert your code here"\\n') == []
+
+
+def test_git_scan_missing_on_disk(tmp_path: Path) -> None:
+    from noellipsis.git import DiffFile, _ellipsis_only_hunks
+
+    patch = DiffFile(path="gone.py", added_text="    ...\\n", added_lines={3}, hunks=[[(3, "    ...")]])
+    extra = _ellipsis_only_hunks(tmp_path / "gone.py", patch, [])
+    assert extra and extra[0].rule_id == "NE002"
+    extra2 = _ellipsis_only_hunks(tmp_path / "gone.py", patch, extra)
+    assert extra2 == []
+    empty = _ellipsis_only_hunks(tmp_path / "gone.py", DiffFile("x.py", "", hunks=[[(1, "   ")]]), [])
+    assert empty == []

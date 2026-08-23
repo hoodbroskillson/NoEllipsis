@@ -34,7 +34,9 @@ def compare_files(generated: Path, original: Path, config: Config) -> ScanResult
     scanner = Scanner(config)
     result.findings.extend(scanner.scan_text(generated, gen_text))
     result.files_scanned = 1
-    result.findings.extend(_compare_texts(generated, gen_text, original, orig_text, config))
+    extra = _compare_texts(generated, gen_text, original, orig_text, config)
+    extra = scanner.filter_findings(generated, gen_text, extra)
+    result.findings.extend(extra)
     result.findings = [f for f in result.findings if not config.is_disabled(f.rule_id)]
     return result
 
@@ -95,7 +97,7 @@ def _python_symbol_diff(
     orig_tree = _try_parse(orig_text)
     gen_tree = _try_parse(gen_text)
     if orig_tree is None or gen_tree is None:
-        return findings
+        return _heuristic_symbol_diff(gen_path, gen_text, orig_text, config)
 
     orig_funcs, orig_classes, orig_methods = _py_symbols(orig_tree)
     gen_funcs, gen_classes, gen_methods = _py_symbols(gen_tree)
@@ -239,7 +241,12 @@ def _py_imports(tree: ast.AST) -> set[str]:
             for alias in node.names:
                 names.add(alias.name.split(".")[0])
         elif isinstance(node, ast.ImportFrom):
-            if node.module:
+            if node.level:
+                if node.module:
+                    names.add("." * node.level + node.module)
+                else:
+                    names.add("." * node.level)
+            elif node.module:
                 names.add(node.module.split(".")[0])
     return names
 
@@ -258,9 +265,13 @@ def _loose_names(text: str) -> set[str]:
 def _import_names_loose(text: str) -> set[str]:
     names: set[str] = set()
     for match in re.finditer(
-        r"^\s*(?:import|from|using|require\(|#include)\s+['\"]?([A-Za-z0-9_./\\-]+)",
+        r"^\s*(?:import|from|using|require\(|#include)\s+['\"]?([.A-Za-z0-9_/\\-]+)",
         text,
         re.M,
     ):
-        names.add(match.group(1).strip("'\"").split("/")[-1].split(".")[0])
+        raw = match.group(1).strip("'\"")
+        if raw.startswith("."):
+            names.add(raw.rstrip("/"))
+        else:
+            names.add(raw.split("/")[-1].split(".")[0])
     return names

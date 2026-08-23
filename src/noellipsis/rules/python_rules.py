@@ -133,12 +133,19 @@ class PythonRules:
 
     def _intentional_stub(self, func: ast.AST, class_stack: list[ast.ClassDef]) -> bool:
         names = _decorator_names(func)
-        if names & {"abstractmethod", "abstractclassmethod", "abstractstaticmethod", "abstractproperty", "overload"}:
+        if names & {
+            "abstractmethod",
+            "abstractclassmethod",
+            "abstractstaticmethod",
+            "abstractproperty",
+            "overload",
+        }:
             return True
         if not class_stack:
             return False
         bases = _base_names(class_stack[-1])
-        if bases & {"Protocol", "ABC"}:
+        # Protocol methods are structural stubs; ABC methods need @abstractmethod.
+        if bases & {"Protocol"}:
             return True
         class_decs = _decorator_names(class_stack[-1])
         if "runtime_checkable" in class_decs:

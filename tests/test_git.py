@@ -27,22 +27,14 @@ index 111..222 100644
 
 
 def test_git_diff_outside_repo(tmp_path: Path) -> None:
-    assert main(["git-diff"]) if False else True
-    code = main(["git-diff"])
-    # may be 0 or 2 depending on whether the workspace is a repo; force isolated cwd
-    from noellipsis import cli as cli_mod
+    import os
 
     old = Path.cwd()
     try:
-        import os
-
         os.chdir(tmp_path)
         assert main(["git-diff"]) == 2
     finally:
         os.chdir(old)
-    _ = cli_mod
-    _ = old
-    _ = code
 
 
 def test_git_diff_detects_new_placeholder(tmp_path: Path) -> None:

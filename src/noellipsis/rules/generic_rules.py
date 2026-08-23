@@ -9,8 +9,8 @@ from pathlib import Path
 from noellipsis.models import Finding, Severity
 from noellipsis.rules.placeholders import find_placeholder_hits
 
-_CONFLICT_START = re.compile(r"^<{7}( |$)")
-_CONFLICT_END = re.compile(r"^>{7}( |$)")
+_CONFLICT_START = re.compile(r"^<{7}")
+_CONFLICT_END = re.compile(r"^>{7}")
 _CONFLICT_MID = re.compile(r"^={7}\s*$")
 _LONE_ELLIPSIS = re.compile(r"^\s*\.\.\.\s*;?\s*$")
 
@@ -18,16 +18,16 @@ _LONE_ELLIPSIS = re.compile(r"^\s*\.\.\.\s*;?\s*$")
 class GenericRules:
     def check(self, path: Path, text: str, language: str) -> list[Finding]:
         findings: list[Finding] = []
-        findings.extend(self._placeholders(path, text))
+        findings.extend(self._placeholders(path, text, language))
         findings.extend(self._lone_ellipsis(path, text, language))
         findings.extend(self._conflicts(path, text))
         if not looks_minified(text):
             findings.extend(self._unbalanced(path, text, language))
         return findings
 
-    def _placeholders(self, path: Path, text: str) -> list[Finding]:
+    def _placeholders(self, path: Path, text: str, language: str) -> list[Finding]:
         out: list[Finding] = []
-        for hit in find_placeholder_hits(text):
+        for hit in find_placeholder_hits(text, language=language):
             out.append(
                 Finding(
                     rule_id="NE001",
@@ -42,7 +42,7 @@ class GenericRules:
         return out
 
     def _lone_ellipsis(self, path: Path, text: str, language: str) -> list[Finding]:
-        if language == "python":
+        if language == "python" or language == "markdown":
             return []
         findings: list[Finding] = []
         for lineno, line in enumerate(text.splitlines(), start=1):
@@ -143,6 +143,51 @@ def _comment_style(language: str) -> _Style:
     return _Style()
 
 
+
+def _js_slash_starts_regex(text: str, i: int) -> bool:
+    j = i - 1
+    while j >= 0 and text[j] in " \t":
+        j -= 1
+    if j < 0:
+        return True
+    ch = text[j]
+    if ch in "=(:,[{!&|?~^;+-*%\n":
+        return True
+    k = j
+    while k >= 0 and (text[k].isalnum() or text[k] == "_"):
+        k -= 1
+    word = text[k + 1 : j + 1]
+    return word in {
+        "return",
+        "case",
+        "throw",
+        "new",
+        "typeof",
+        "delete",
+        "void",
+        "await",
+        "yield",
+        "in",
+        "of",
+    }
+
+
+def _rust_raw_header(text: str, i: int) -> int | None:
+    idx = i
+    if idx < len(text) and text[idx] in {"b", "c"}:
+        idx += 1
+    if idx >= len(text) or text[idx] != "r":
+        return None
+    idx += 1
+    hashes = 0
+    while idx < len(text) and text[idx] == "#":
+        hashes += 1
+        idx += 1
+    if idx < len(text) and text[idx] == '"':
+        return hashes
+    return None
+
+
 def scan_delimiters(text: str, language: str) -> tuple[str, int, int] | None:
     """State machine for (), [], {} that ignores strings and comments."""
     style = _comment_style(language)
@@ -152,6 +197,7 @@ def scan_delimiters(text: str, language: str) -> tuple[str, int, int] | None:
     line = 1
     col = 1
     state = "code"
+    rust_hashes = [0]
 
     def bump(count: int = 1) -> None:
         nonlocal i, line, col
@@ -185,13 +231,36 @@ def scan_delimiters(text: str, language: str) -> tuple[str, int, int] | None:
                 state = "py_dq3"
                 bump(3)
                 continue
-            if ch in "'\"`":
-                if ch == "'":
-                    state = "sq"
-                elif ch == "`" and language in {"javascript", "typescript"}:
+            if language in {"javascript", "typescript"} and ch == "/" and not text.startswith(
+                "//", i
+            ) and not text.startswith("/*", i):
+                if _js_slash_starts_regex(text, i):
+                    state = "js_regex"
+                    bump()
+                    continue
+            if language == "rust":
+                rh = _rust_raw_header(text, i)
+                if rh is not None:
+                    rust_hashes[0] = rh
+                    prefix = 0
+                    if text[i] in {"b", "c"}:
+                        prefix += 1
+                    prefix += 1 + rh + 1
+                    bump(prefix)
+                    state = "rust_raw"
+                    continue
+            if ch == "`":
+                if language in {"javascript", "typescript"}:
                     state = "template"
+                elif language == "go":
+                    state = "go_raw"
                 else:
-                    state = "dq"
+                    bump()
+                    continue
+                bump()
+                continue
+            if ch in {"'", '"'}:
+                state = "sq" if ch == "'" else "dq"
                 bump()
                 continue
             if ch in _PAIRS:
@@ -218,6 +287,50 @@ def scan_delimiters(text: str, language: str) -> tuple[str, int, int] | None:
                 bump(len(style.block_close))
                 state = "code"
                 continue
+            bump()
+            continue
+
+        if state == "js_regex":
+            if ch == "\\":
+                bump(2)
+                continue
+            if ch == "[":
+                state = "js_regex_class"
+                bump()
+                continue
+            if ch == "/":
+                bump()
+                state = "code"
+                continue
+            bump()
+            continue
+
+        if state == "js_regex_class":
+            if ch == "\\":
+                bump(2)
+                continue
+            if ch == "]":
+                state = "js_regex"
+                bump()
+                continue
+            bump()
+            continue
+
+        if state == "go_raw":
+            if ch == "`":
+                bump()
+                state = "code"
+                continue
+            bump()
+            continue
+
+        if state == "rust_raw":
+            if ch == '"':
+                end = i + 1
+                if text[end : end + rust_hashes[0]] == ("#" * rust_hashes[0]):
+                    bump(1 + rust_hashes[0])
+                    state = "code"
+                    continue
             bump()
             continue
 
