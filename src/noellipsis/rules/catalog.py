@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from noellipsis import __version__
 from noellipsis.models import Severity
 
-HELP_URI = f"https://github.com/hoodbroskillson/NoEllipsis/blob/main/README.md#rules"
-DOCS_URI = f"https://github.com/hoodbroskillson/NoEllipsis/blob/main/docs/sarif.md"
+HELP_URI = "https://github.com/hoodbroskillson/NoEllipsis/blob/main/README.md#rules"
+DOCS_URI = "https://github.com/hoodbroskillson/NoEllipsis/blob/main/docs/sarif.md"
 
 
 @dataclass(frozen=True)
