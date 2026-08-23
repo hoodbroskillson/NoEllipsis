@@ -61,17 +61,6 @@ jobs:
           python -m pip uninstall -y noellipsis
           python -m pip install dist/*.tar.gz
           noellipsis --version
-      - name: pre-commit hook manifest
-        run: python -c "import yaml,sys; print('skip-if-no-yaml')" || true
-        continue-on-error: true
-      - name: Validate pre-commit hook yaml
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          text = Path(".pre-commit-hooks.yaml").read_text()
-          assert "id: noellipsis" in text
-          print("pre-commit hook manifest ok")
-          PY
 
   test-windows:
     runs-on: windows-latest
@@ -131,3 +120,65 @@ jobs:
           format: json
       - name: Dirty fixtures must fail
         run: test "${{ steps.dirty.outcome }}" = "failure"
+      - name: Action SARIF write
+        id: sarif
+        continue-on-error: true
+        uses: ./
+        with:
+          path: tests/fixtures/should_flag
+          command: check
+          fail-on: error
+          format: sarif
+          sarif-file: noellipsis.sarif
+      - name: SARIF file exists and parses
+        run: |
+          set -euo pipefail
+          test -f noellipsis.sarif
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          doc = json.loads(Path("noellipsis.sarif").read_text())
+          assert doc["version"] == "2.1.0"
+          print("sarif ok", len(doc["runs"][0]["results"]), "results")
+          PY
+          test "${{ steps.sarif.outputs.exit-code }}" = "1"
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pre-commit-cache
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-hooks.yaml', 'pyproject.toml') }}
+      - name: Validate manifest
+        env:
+          PRE_COMMIT_HOME: ${{ runner.temp }}/pre-commit-cache
+        run: pre-commit validate-manifest .pre-commit-hooks.yaml
+      - name: try-repo
+        env:
+          PRE_COMMIT_HOME: ${{ runner.temp }}/pre-commit-cache
+        run: pre-commit try-repo . noellipsis --all-files
+      - name: Consumer repo hook fails on incomplete staged file
+        env:
+          PRE_COMMIT_HOME: ${{ runner.temp }}/pre-commit-cache
+        run: |
+          set -euo pipefail
+          ROOT="$PWD"
+          CONSUMER="$(mktemp -d)"
+          git init "$CONSUMER"
+          git -C "$CONSUMER" -c user.email=ci@example.test -c user.name=ci commit --allow-empty -m init
+          printf '%s\n' "repos:" "  - repo: $ROOT" "    rev: HEAD" "    hooks:" "      - id: noellipsis" > "$CONSUMER/.pre-commit-config.yaml"
+          printf '%s\n' "def leftover():" "    ..." > "$CONSUMER/incomplete.py"
+          git -C "$CONSUMER" add incomplete.py .pre-commit-config.yaml
+          set +e
+          (cd "$CONSUMER" && pre-commit run noellipsis)
+          code=$?
+          set -e
+          test "$code" -ne 0

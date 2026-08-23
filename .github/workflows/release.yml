@@ -42,12 +42,13 @@ jobs:
         run: python -m build
       - name: Twine
         run: python -m twine check dist/*
-      - name: SHA256SUMS
+      - name: SHA256SUMS and versioned release notes
         run: |
           set -euo pipefail
-          cd dist
-          sha256sum *.whl *.tar.gz > SHA256SUMS
-          cat SHA256SUMS
+          python scripts/render_release_notes.py --root . --dist dist --output /tmp/release-notes.md
+          test -f /tmp/release-notes.md
+          test -f dist/SHA256SUMS
+          cat dist/SHA256SUMS
       - name: Upload the same bytes
         uses: actions/upload-artifact@v7
         with:
@@ -57,7 +58,7 @@ jobs:
             dist/*.tar.gz
             dist/SHA256SUMS
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/*.whl
@@ -67,12 +68,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          NOTES="docs/release-notes-1.1.0.md"
-          if [ -f "$NOTES" ]; then
-            gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --title "$GITHUB_REF_NAME" --notes-file "$NOTES"
-          else
-            gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --generate-notes --title "$GITHUB_REF_NAME"
+          NOTES="/tmp/release-notes.md"
+          if [ ! -f "$NOTES" ]; then
+            echo "error: rendered release notes missing; refusing gh release create"
+            exit 1
           fi
+          gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --title "$GITHUB_REF_NAME" --notes-file "$NOTES"
 
   publish:
     needs: build
