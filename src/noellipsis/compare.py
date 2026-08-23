@@ -68,8 +68,8 @@ def _compare_texts(
                     f"({gen_size} vs {len(orig_text)} bytes; threshold {config.shrink_threshold}%)"
                 ),
                 suggestion="Confirm the model did not drop the rest of the file before replacing it.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
 
@@ -86,8 +86,8 @@ def _compare_texts(
                 path=str(gen_path),
                 message="Probable full-file replacement with a partial snippet",
                 suggestion="Paste only into the intended region, or request a complete file from the model.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
     return findings
@@ -116,8 +116,8 @@ def _python_symbol_diff(
                     "Restore the missing function or merge the generated "
                     "fragment instead of replacing the file."
                 ),
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
     for name in sorted(orig_classes - gen_classes):
@@ -128,8 +128,8 @@ def _python_symbol_diff(
                 path=str(gen_path),
                 message=f"Top-level class removed: {name}",
                 suggestion="Restore the missing class or merge the generated fragment instead of replacing the file.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
     for key in sorted(orig_methods - gen_methods):
@@ -140,8 +140,8 @@ def _python_symbol_diff(
                 path=str(gen_path),
                 message=f"Method removed: {key}",
                 suggestion="Restore the missing method; the generated file may be a partial snippet.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
 
@@ -158,8 +158,8 @@ def _python_symbol_diff(
                 path=str(gen_path),
                 message=f"Imports unexpectedly removed: {preview}{extra}",
                 suggestion="Re-introduce the dropped imports or confirm they are unused after a complete rewrite.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
     return findings
@@ -179,8 +179,8 @@ def _heuristic_symbol_diff(
                 path=str(gen_path),
                 message=f"Top-level function/class removed: {name}",
                 suggestion="Restore the missing symbol or merge the snippet instead of replacing the file.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
     orig_imp = set(_import_names_loose(orig_text))
@@ -194,8 +194,8 @@ def _heuristic_symbol_diff(
                 path=str(gen_path),
                 message=f"Imports unexpectedly removed: {', '.join(missing[:8])}",
                 suggestion="Re-introduce the dropped imports or confirm they are unused.",
-                line=1,
-                column=1,
+                line=None,
+                column=None,
             )
         )
     return findings

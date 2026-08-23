@@ -311,3 +311,79 @@ def test_markdown_atx_heading_is_not_ne001(tmp_path: Path) -> None:
     html = "<!-- Insert your code here -->\n"
     findings = Scanner(Config()).scan_text(tmp_path / "guide.md", html)
     assert any(f.rule_id == "NE001" for f in findings)
+
+
+def test_git_diff_delete_only_unbalanced_ne005(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "app.js"
+    target.write_text("function ok() {\n  return 1;\n}\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("function ok() {\n  return 1;\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=False, cwd=tmp_path)
+    assert any(f.rule_id == "NE005" for f in result.findings)
+
+
+def test_git_diff_delete_only_truncated_ne006(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "app.py"
+    target.write_text("def leftover():\n    return (\n        1\n    )\n", encoding="utf-8")
+    _git(["add", "app.py"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("def leftover():\n    return (\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=False, cwd=tmp_path)
+    assert any(f.rule_id == "NE006" for f in result.findings)
+
+
+def test_git_diff_staged_delete_only_ne005(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "app.js"
+    target.write_text("function ok() {\n  return 1;\n}\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("function ok() {\n  return 1;\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    result = scan_git_diff(Config(), staged=True, cwd=tmp_path)
+    assert any(f.rule_id == "NE005" for f in result.findings)
+
+
+def test_cli_unreadable_plus_findings_prints_then_exit_2(tmp_path: Path, capsys) -> None:
+    good = tmp_path / "good.py"
+    good.write_text("def calculate_total():\n    ...\n", encoding="utf-8")
+    bad = tmp_path / "bad.py"
+    bad.write_text("x = 1\n", encoding="utf-8")
+    real = Path.read_bytes
+
+    def boom(self):
+        if self.name == "bad.py":
+            raise OSError("nope")
+        return real(self)
+
+    Path.read_bytes = boom
+    try:
+        code = main(["check", str(tmp_path)])
+    finally:
+        Path.read_bytes = real
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "NE002" in captured.out
+    assert "Unreadable" in captured.err
+
+
+def test_compare_ignore_after_module_docstring(tmp_path: Path) -> None:
+    original = tmp_path / "o.py"
+    generated = tmp_path / "g.py"
+    original.write_text(
+        "import os\n\ndef a():\n    return os.name\n\ndef b():\n    return 2\n",
+        encoding="utf-8",
+    )
+    generated.write_text(
+        '"""Module docs."""\n# noellipsis: ignore[NE101]\ndef a():\n    return 1\n',
+        encoding="utf-8",
+    )
+    result = compare_files(generated, original, Config())
+    ids = {f.rule_id for f in result.findings}
+    assert "NE101" not in ids

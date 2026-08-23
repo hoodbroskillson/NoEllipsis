@@ -170,10 +170,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     for err in result.errors:
         print(f"error: {err}", file=sys.stderr)
 
+    sys.stdout.write(format_result(result, cfg.output_format))
     if result.errors:
         return 2
-
-    sys.stdout.write(format_result(result, cfg.output_format))
     return _exit_from(result, cfg.fail_on)
 
 

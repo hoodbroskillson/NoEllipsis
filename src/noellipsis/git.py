@@ -62,8 +62,8 @@ def scan_git_diff(config: Config, *, staged: bool = False, cwd: Path | None = No
     scanner = Scanner(config, root=root)
     result = ScanResult()
     for patch in patches:
-        if not patch.added_text.strip() and not patch.added_lines:
-            continue
+        # Delete-only hunks have no plus lines; still scan WT/index so
+        # NE005/NE006 can fire when a closer or leftover syntax is gone.
         rel = patch.path
         if any(part in SKIP_DIR_NAMES for part in Path(rel).parts):
             continue

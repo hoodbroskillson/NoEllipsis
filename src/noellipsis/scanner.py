@@ -253,9 +253,27 @@ def _ids_in_ignore(comment: str) -> set[str]:
     return {part.strip().upper() for part in match.group(1).split(",") if part.strip()}
 
 
+def _docstring_quote(stripped: str) -> str | None:
+    i = 0
+    if i < len(stripped) and stripped[i] in "rRuUbBfF":
+        i += 1
+        if i < len(stripped) and stripped[i] in "rRuUbBfF":
+            i += 1
+    dq, sq = '"""', "'''"
+    if stripped.startswith((dq, sq), i):
+        return stripped[i : i + 3]
+    return None
+
+
 def _header_rule_suppressed(lines: list[str], rule_id: str, language: str) -> bool:
     rid = rule_id.upper()
+    in_docstring = False
+    quote = ""
     for text in lines:
+        if in_docstring:
+            if quote and quote in text:
+                in_docstring = False
+            continue
         stripped = text.strip()
         comment = _comment_text(text, language)
         if comment:
@@ -266,6 +284,14 @@ def _header_rule_suppressed(lines: list[str], rule_id: str, language: str) -> bo
             continue
         if stripped.startswith("#!"):
             continue
+        if language == "python":
+            q = _docstring_quote(stripped)
+            if q is not None:
+                after = stripped[stripped.find(q) + 3 :]
+                if q not in after:
+                    in_docstring = True
+                    quote = q
+                continue
         break
     return False
 
