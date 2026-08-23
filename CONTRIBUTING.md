@@ -19,7 +19,7 @@ ruff check .
 pytest -q
 ```
 
-Python 3.11+ is required. CI also runs 3.12 and 3.13, plus one Windows and one macOS job.
+Python 3.11+ is required. CI runs 3.11–3.14 on Ubuntu, plus Windows and macOS on 3.12.
 
 ## Adding a rule
 
@@ -36,8 +36,8 @@ Python 3.11+ is required. CI also runs 3.12 and 3.13, plus one Windows and one m
 
 ## Release checklist
 
-1. Version is `1.0.0` (or the next semver) in `pyproject.toml` and `src/noellipsis/__init__.py`.
+1. Version is `1.1.0` (or the next semver) in `pyproject.toml` and `src/noellipsis/__init__.py`.
 2. `CHANGELOG.md` has a dated section.
 3. `ruff check .` and `pytest -q` pass; coverage stays at or above 90%.
 4. `python -m build && python -m twine check dist/*` (from the `dev` or `release` extra).
-5. Tag `vX.Y.Z` matching the version. The release workflow publishes a GitHub release only — never PyPI.
+5. A human tags `vX.Y.Z` on GitHub. See `docs/releasing.md`. Never publish to PyPI from your machine; never recreate `v1.0.0`.

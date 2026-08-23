@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-23
+
+### Added
+- SARIF 2.1.0 output (`--format sarif`) with driver rules, repo-relative URIs, 1-based locations, stable partial fingerprints, and invocation notifications for unreadable files.
+- `noellipsis rules` lists every rule id, default severity, and short description (`--format text|json`).
+- Reusable GitHub Action `hoodbroskillson/NoEllipsis@v1.1.0` (composite + Python argv runner; Linux/macOS/Windows).
+- Example workflow that generates SARIF and uploads it with `github/codeql-action/upload-sarif@v4` even when the scanner exits 1.
+- Hypothesis property tests (dev extra) and golden fixtures under `tests/fixtures/`.
+- CI on Python 3.14; wheel/sdist smoke; Dependabot for github-actions and pip; CodeQL workflow.
+- Release workflow builds artifacts once, writes SHA256SUMS, attests provenance, attaches the same bytes to the GitHub Release, and publishes via Trusted Publisher (`environment: pypi`, `pypa/gh-action-pypi-publish@release/v1`). No PyPI token secret.
+
+### Changed
+- Documentation landing page, architecture, SARIF, and releasing guides. Install remains git-tag until the first PyPI upload.
+- Third-party Actions pinned to current majors (`actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `actions/attest-build-provenance@v3`, CodeQL `@v4`).
+
+[1.1.0]: https://github.com/hoodbroskillson/NoEllipsis/releases/tag/v1.1.0
+
 ## [1.0.0] - 2026-08-23
 
 ### Added

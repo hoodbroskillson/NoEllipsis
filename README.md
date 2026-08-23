@@ -13,10 +13,10 @@ It is **not** an AI-content detector, a full compiler, a vulnerability scanner, 
 
 ![Terminal demo](docs/demo.svg)
 
-## 30-second demo
+## 2-minute landing
 
 ```bash
-python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.0.0"
+python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
 noellipsis --version
 noellipsis check examples/ok_examples.py --format text
 noellipsis check examples/incomplete.py --format text
@@ -29,10 +29,10 @@ The image above is a static terminal snapshot generated from real CLI output (se
 
 ## Install
 
-Requires Python 3.11+. There is no PyPI package; install from the git tag:
+Requires Python 3.11+. The project is **not on PyPI yet** (no version badge). After the first Trusted Publisher upload, `pipx install noellipsis` / `pip install noellipsis` will work. Until then, install from the git tag:
 
 ```bash
-python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.0.0"
+python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
 ```
 
 Then:
@@ -50,7 +50,7 @@ ruff check .
 pytest -q
 ```
 
-The `dev` extra includes pytest, ruff, build, and twine. Runtime dependencies remain empty.
+The `dev` extra includes pytest, pytest-cov, ruff, build, twine, Hypothesis, and pre-commit. Runtime dependencies remain empty.
 
 ## Commands
 
@@ -93,11 +93,20 @@ noellipsis git-diff --staged --format github
 
 Outside a repository the command exits `2` with a clear error.
 
+### `noellipsis rules`
+
+Print the built-in catalog (deterministic order). `--format json` or `text`.
+
+```bash
+noellipsis rules
+noellipsis rules --format json
+```
+
 ## Options
 
 | Option | Meaning |
 | --- | --- |
-| `--format text\|json\|github` | Human text, stable JSON, or GitHub Actions annotations |
+| `--format text\|json\|github\|sarif` | Human text, stable JSON, GitHub Actions annotations, or SARIF 2.1.0 |
 | `--fail-on error\|warning` | Minimum severity that yields exit code `1` |
 | `--exclude PATTERN` | Extra glob (repeatable) |
 | `--disable RULE_ID` | Turn off a rule (repeatable) |
@@ -184,7 +193,7 @@ Multiple ids: `noellipsis: ignore[NE002,NE003]`.
 ```yaml
 repos:
   - repo: https://github.com/hoodbroskillson/NoEllipsis
-    rev: v1.0.0
+    rev: v1.1.0
     hooks:
       - id: noellipsis
 ```
@@ -198,11 +207,24 @@ The hook runs `noellipsis git-diff --staged` with no filename arguments and does
 - uses: actions/setup-python@v5
   with:
     python-version: "3.12"
-- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.0.0"
+- run: python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
 - run: noellipsis git-diff --format github
 ```
 
-This repository’s own CI is `.github/workflows/ci.yml`. Releases from `v*.*.*` tags attach a wheel and sdist on GitHub; they are **not** published to PyPI.
+Reusable action (exact tag, never a floating `v1`):
+
+```yaml
+- uses: hoodbroskillson/NoEllipsis@v1.1.0
+  with:
+    path: .
+    command: check
+    format: github
+    fail-on: error
+```
+
+See `action/README.md`. SARIF upload example: `.github/workflows/noellipsis-sarif.yml` (`contents: read`, `security-events: write`, `github/codeql-action/upload-sarif@v4`).
+
+This repository’s own CI is `.github/workflows/ci.yml`. The `release.yml` workflow builds once, checksums and attests artifacts, attaches the same bytes to the GitHub Release, and is prepared to publish to PyPI via Trusted Publisher (`environment: pypi`). Do not publish from a laptop.
 
 ## Output
 
@@ -222,7 +244,7 @@ GitHub Actions (special characters in paths and messages are escaped):
 ::error file=src/example.py,line=84,col=5::NE002 Bare ellipsis used as function body
 ```
 
-JSON is deterministic (sorted keys, findings ordered by file / line / rule).
+JSON is deterministic (sorted keys, findings ordered by file / line / rule). SARIF is a standalone JSON document on stdout (see `docs/sarif.md`).
 
 ## Limitations (honest)
 
