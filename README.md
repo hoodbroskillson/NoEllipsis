@@ -3,6 +3,7 @@
 [![CI](https://github.com/hoodbroskillson/NoEllipsis/actions/workflows/ci.yml/badge.svg)](https://github.com/hoodbroskillson/NoEllipsis/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/hoodbroskillson/NoEllipsis)](https://github.com/hoodbroskillson/NoEllipsis/releases)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![PyPI](https://img.shields.io/pypi/v/noellipsis)](https://pypi.org/project/noellipsis/)
 [![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A fast, **local** CLI that detects incomplete or dangerously truncated LLM-generated code **before** you paste, commit, or deploy it.
@@ -16,7 +17,8 @@ It is **not** an AI-content detector, a full compiler, a vulnerability scanner, 
 ## 2-minute landing
 
 ```bash
-python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
+pipx install noellipsis
+# or: python -m pip install noellipsis
 noellipsis --version
 noellipsis check examples/ok_examples.py --format text
 noellipsis check examples/incomplete.py --format text
@@ -29,7 +31,14 @@ The image above is a static terminal snapshot generated from real CLI output (se
 
 ## Install
 
-Requires Python 3.11+. The project is **not on PyPI yet** (no version badge). After the first Trusted Publisher upload, `pipx install noellipsis` / `pip install noellipsis` will work. Until then, install from the git tag:
+Requires Python 3.11+.
+
+```bash
+pipx install noellipsis
+python -m pip install noellipsis
+```
+
+From the git tag (same version):
 
 ```bash
 python -m pip install "noellipsis @ git+https://github.com/hoodbroskillson/NoEllipsis.git@v1.1.0"
