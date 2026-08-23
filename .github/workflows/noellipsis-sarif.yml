@@ -24,7 +24,7 @@ jobs:
         continue-on-error: true
         run: |
           set +e
-          noellipsis check . --format sarif > noellipsis.sarif
+          noellipsis check src --format sarif > noellipsis.sarif
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           python -c "import json; json.load(open('noellipsis.sarif'))"
       - name: Upload SARIF
