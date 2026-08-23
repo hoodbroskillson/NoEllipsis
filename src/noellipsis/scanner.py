@@ -11,6 +11,7 @@ from noellipsis.config import Config
 from noellipsis.models import Finding, ScanResult
 from noellipsis.rules.generic_rules import GenericRules, looks_minified
 from noellipsis.rules.markdown_rules import MarkdownRules
+from noellipsis.rules.placeholders import comment_start
 from noellipsis.rules.python_rules import PythonRules
 
 SUPPRESS_LINE = re.compile(
@@ -127,7 +128,7 @@ class Scanner:
             path.suffix.lower() in {".js", ".mjs"} and looks_minified(text)
         ):
             return []
-        if _file_suppressed(text):
+        if file_is_suppressed(text, language):
             return []
         findings: list[Finding] = []
         if language == "python":
@@ -135,7 +136,7 @@ class Scanner:
         findings.extend(self._generic.check(path, text, language))
         if language == "markdown":
             findings.extend(self._markdown.check(path, text))
-        return self._filter(path, text, findings)
+        return self._filter(path, text, findings, language)
 
     def scan_file(self, path: Path) -> list[Finding]:
         if path.suffix.lower() in _BINARY_EXT:
@@ -150,15 +151,19 @@ class Scanner:
         return self.scan_text(path, text)
 
     def filter_findings(self, path: Path, text: str, findings: list[Finding]) -> list[Finding]:
-        return self._filter(path, text, findings)
+        return self._filter(path, text, findings, language_for(path) or "")
 
-    def _filter(self, path: Path, text: str, findings: list[Finding]) -> list[Finding]:
+    def _filter(
+        self, path: Path, text: str, findings: list[Finding], language: str | None = None
+    ) -> list[Finding]:
+        del path
         lines = text.splitlines()
+        lang = language or ""
         kept: list[Finding] = []
         for finding in findings:
             if self.config.is_disabled(finding.rule_id):
                 continue
-            if _line_suppressed(lines, finding.line, finding.rule_id):
+            if _line_suppressed(lines, finding.line, finding.rule_id, lang):
                 continue
             kept.append(finding)
         return kept
@@ -228,72 +233,59 @@ def path_is_excluded(path: Path, config: Config, *, root: Path | None = None) ->
     return False
 
 
-def _comment_start(line: str) -> int | None:
-    i = 0
-    n = len(line)
-    quote: str | None = None
-    tq = chr(34) * 3
-    sq3 = chr(39) * 3
-    while i < n:
-        ch = line[i]
-        if quote:
-            if ch == "\\" and quote in {chr(39), chr(34), "`"}:
-                i += 2
-                continue
-            if line.startswith(quote, i):
-                i += len(quote)
-                quote = None
-                continue
-            i += 1
-            continue
-        if line.startswith((tq, sq3), i):
-            quote = line[i : i + 3]
-            i += 3
-            continue
-        if ch in {chr(39), chr(34), "`"}:
-            quote = ch
-            i += 1
-            continue
-        if ch == "#":
-            return i
-        if line.startswith("//", i) or line.startswith("/*", i):
-            return i
-        if line.startswith("<!--", i):
-            return i
-        i += 1
-    return None
-
-
-def _comment_text(line: str) -> str:
-    start = _comment_start(line)
+def _comment_text(line: str, language: str = "") -> str:
+    start = comment_start(line, language)
     return "" if start is None else line[start:]
 
 
-def _file_suppressed(text: str) -> bool:
+def file_is_suppressed(text: str, language: str = "") -> bool:
     for line in text.splitlines():
-        comment = _comment_text(line)
+        comment = _comment_text(line, language)
         if comment and SUPPRESS_FILE.search(comment):
             return True
     return False
 
 
-def _line_suppressed(lines: list[str], line: int | None, rule_id: str) -> bool:
-    if line is None:
-        return False
+def _ids_in_ignore(comment: str) -> set[str]:
+    match = SUPPRESS_LINE.search(comment)
+    if not match:
+        return set()
+    return {part.strip().upper() for part in match.group(1).split(",") if part.strip()}
+
+
+def _header_rule_suppressed(lines: list[str], rule_id: str, language: str) -> bool:
+    rid = rule_id.upper()
+    for text in lines:
+        stripped = text.strip()
+        comment = _comment_text(text, language)
+        if comment:
+            if rid in _ids_in_ignore(comment):
+                return True
+            continue
+        if not stripped:
+            continue
+        if stripped.startswith("#!"):
+            continue
+        break
+    return False
+
+
+def _line_suppressed(lines: list[str], line: int | None, rule_id: str, language: str = "") -> bool:
+    rid = rule_id.upper()
+    if line is None or line == 1:
+        if _header_rule_suppressed(lines, rid, language):
+            return True
+        if line is None:
+            return False
     candidates = []
     for offset in range(0, 3):
         idx = line - 1 - offset
         if 0 <= idx < len(lines):
             candidates.append(lines[idx])
-    rid = rule_id.upper()
     for text in candidates:
-        comment = _comment_text(text)
+        comment = _comment_text(text, language)
         if not comment:
             continue
-        match = SUPPRESS_LINE.search(comment)
-        if not match:
-            continue
-        ids = {part.strip().upper() for part in match.group(1).split(",") if part.strip()}
-        if rid in ids:
+        if rid in _ids_in_ignore(comment):
             return True
     return False

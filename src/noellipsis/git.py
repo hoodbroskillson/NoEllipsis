@@ -70,20 +70,55 @@ def scan_git_diff(config: Config, *, staged: bool = False, cwd: Path | None = No
         full = root / rel
         if path_is_excluded(full, config, root=root) or path_is_excluded(Path(rel), config, root=root):
             continue
-        if full.is_file():
+        if staged:
+            blob = _index_blob(root, rel)
+            if blob is None:
+                findings = scanner.scan_text(full, patch.added_text)
+            else:
+                findings = scanner.scan_text(full, blob)
+        elif full.is_file():
             findings = scanner.scan_file(full)
         else:
             findings = scanner.scan_text(full, patch.added_text)
+        pre_ids: set[str] | None = None
+        is_new = patch.is_new
+        rel_path = rel
+        scan_path = full
         kept: list[Finding] = []
         for finding in findings:
-            if finding.rule_id in {"NE005", "NE006"} and not patch.is_new:
+            on_added = finding.line is None or finding.line in patch.added_lines
+            if finding.rule_id in {"NE005", "NE006"}:
+                if not on_added and not is_new:
+                    if pre_ids is None:
+                        prior = _git_blob(root, f"HEAD:{rel_path}")
+                        pre_ids = (
+                            set()
+                            if prior is None
+                            else {item.rule_id for item in scanner.scan_text(scan_path, prior)}
+                        )
+                    if finding.rule_id in pre_ids:
+                        continue
+                kept.append(finding)
                 continue
-            if finding.line is None or finding.line in patch.added_lines:
+            if on_added:
                 kept.append(finding)
         kept.extend(_ellipsis_only_hunks(full, patch, kept))
         result.findings.extend(kept)
         result.files_scanned += 1
     return result
+
+
+
+def _git_blob(root: Path, spec: str) -> str | None:
+    proc = run_git(["show", spec], cwd=root)
+    if proc.returncode != 0:
+        return None
+    return proc.stdout
+
+
+def _index_blob(root: Path, rel: str) -> str | None:
+    """Return the staged (index) contents of rel, or None if git cannot show it."""
+    return _git_blob(root, f":{rel}")
 
 
 def _ellipsis_only_hunks(path: Path, patch: DiffFile, existing: list[Finding]) -> list[Finding]:

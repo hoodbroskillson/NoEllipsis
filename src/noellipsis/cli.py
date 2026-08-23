@@ -170,7 +170,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for err in result.errors:
         print(f"error: {err}", file=sys.stderr)
 
-    if result.errors and result.files_scanned == 0 and not result.findings:
+    if result.errors:
         return 2
 
     sys.stdout.write(format_result(result, cfg.output_format))

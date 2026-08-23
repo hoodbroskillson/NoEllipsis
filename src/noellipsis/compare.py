@@ -8,7 +8,7 @@ from pathlib import Path
 
 from noellipsis.config import Config
 from noellipsis.models import Finding, ScanResult, Severity
-from noellipsis.scanner import Scanner, language_for
+from noellipsis.scanner import Scanner, file_is_suppressed, language_for
 
 _IDENT = re.compile(r"\b(?:function|class|def|fn|func|pub\s+fn|public\s+class)\s+([A-Za-z_][\w]*)")
 _JS_FUNC = re.compile(
@@ -32,8 +32,11 @@ def compare_files(generated: Path, original: Path, config: Config) -> ScanResult
         return result
 
     scanner = Scanner(config)
-    result.findings.extend(scanner.scan_text(generated, gen_text))
     result.files_scanned = 1
+    lang = language_for(generated) or language_for(original) or ""
+    if file_is_suppressed(gen_text, lang):
+        return result
+    result.findings.extend(scanner.scan_text(generated, gen_text))
     extra = _compare_texts(generated, gen_text, original, orig_text, config)
     extra = scanner.filter_findings(generated, gen_text, extra)
     result.findings.extend(extra)

@@ -22,6 +22,19 @@ _PHRASE_RES = [
     re.compile(r"not implemented(?: yet)?\s*[.!]?\s*$", re.I),
 ]
 
+_HASH_COMMENT_LANGS = {"python", "ruby", "shell", "php"}
+_SLASH_COMMENT_LANGS = {
+    "javascript",
+    "typescript",
+    "java",
+    "go",
+    "rust",
+    "c",
+    "cpp",
+    "csharp",
+    "php",
+}
+
 
 @dataclass(frozen=True)
 class PhraseHit:
@@ -30,11 +43,19 @@ class PhraseHit:
     snippet: str
 
 
-def _comment_start(line: str) -> int | None:
-    """Index where a comment begins, or None. Strings are not comments."""
+def comment_start(line: str, language: str = "") -> int | None:
+    """Index where a language-aware comment begins, or None. Strings are not comments."""
     i = 0
     n = len(line)
     quote: str | None = None
+    lang = (language or "").lower()
+    allow_hash = lang in _HASH_COMMENT_LANGS or lang == ""
+    allow_slash = lang in _SLASH_COMMENT_LANGS or lang == ""
+    allow_html = lang in {"markdown", ""} or lang not in _HASH_COMMENT_LANGS
+    if lang == "markdown":
+        allow_hash = False
+        allow_slash = False
+        allow_html = True
     while i < n:
         ch = line[i]
         if quote:
@@ -55,11 +76,11 @@ def _comment_start(line: str) -> int | None:
             quote = ch
             i += 1
             continue
-        if ch == "#":
+        if allow_hash and ch == "#":
             return i
-        if line.startswith("//", i) or line.startswith("/*", i):
+        if allow_slash and (line.startswith("//", i) or line.startswith("/*", i)):
             return i
-        if line.startswith("<!--", i):
+        if allow_html and line.startswith("<!--", i):
             return i
         i += 1
     return None
@@ -67,10 +88,9 @@ def _comment_start(line: str) -> int | None:
 
 def find_placeholder_hits(text: str, *, language: str = "") -> list[PhraseHit]:
     """Flag placeholder phrases only in comments, not quoted documentation."""
-    del language  # reserved: comment detection is language-agnostic enough
     hits: list[PhraseHit] = []
     for lineno, line in enumerate(text.splitlines(), start=1):
-        cstart = _comment_start(line)
+        cstart = comment_start(line, language)
         if cstart is None:
             continue
         region = line[cstart:]

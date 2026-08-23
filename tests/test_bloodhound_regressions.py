@@ -139,7 +139,7 @@ def test_cli_errors_do_not_override_findings(tmp_path: Path, capsys) -> None:
         code = main(["check", str(path)])
     finally:
         cli_mod.Scanner.scan_path = real_scan
-    assert code == 1
+    assert code == 2
     assert "partial read" in capsys.readouterr().err
 
 
@@ -205,3 +205,109 @@ def test_relative_imports_count_for_ne103(tmp_path: Path) -> None:
     assert ne103
     msg = ne103[0].message
     assert "." in msg or ".mod" in msg
+
+
+def test_git_diff_keeps_ne005_on_added_lines(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "app.js"
+    target.write_text("function f() {\n  return foo();\n}\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("function f() {\n  return foo(\n}\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=False, cwd=tmp_path)
+    assert any(f.rule_id == "NE005" for f in result.findings)
+
+
+def test_git_diff_drops_preexisting_ne005_on_unmodified_lines(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "app.js"
+    target.write_text("function f() {\n  return foo(\n}\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("function f() {\n  return foo(\n}\n// note\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=False, cwd=tmp_path)
+    assert not any(f.rule_id == "NE005" for f in result.findings)
+
+
+def test_git_diff_staged_reads_index_not_workdir(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "app.js"
+    target.write_text("function f() { return 1; }\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("function f() {\n  return 1;\n}\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    target.write_text("function f() {\n  ...\n}\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=True, cwd=tmp_path)
+    assert not any(f.rule_id == "NE002" for f in result.findings)
+
+    target.write_text("function f() {\n  // Insert your code here\n  return 1;\n}\n", encoding="utf-8")
+    _git(["add", "app.js"], tmp_path)
+    target.write_text("function f() { return 1; }\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=True, cwd=tmp_path)
+    assert any(f.rule_id == "NE001" for f in result.findings)
+
+
+def test_compare_ignore_file_skips_extras(tmp_path: Path) -> None:
+    original = tmp_path / "o.py"
+    generated = tmp_path / "g.py"
+    original.write_text(
+        "import os\n\ndef a():\n    return os.name\n\ndef b():\n    return 2\n",
+        encoding="utf-8",
+    )
+    generated.write_text("# noellipsis: ignore-file\ndef a():\n    return 1\n", encoding="utf-8")
+    result = compare_files(generated, original, Config())
+    ids = {f.rule_id for f in result.findings}
+    assert ids == set()
+
+
+def test_compare_header_ignore_not_on_line_one(tmp_path: Path) -> None:
+    original = tmp_path / "o.py"
+    generated = tmp_path / "g.py"
+    original.write_text(
+        "import os\n\ndef a():\n    return os.name\n\ndef b():\n    return 2\n",
+        encoding="utf-8",
+    )
+    generated.write_text(
+        "#!/usr/bin/env python\n# noellipsis: ignore[NE101,NE102,NE103,NE104]\ndef a():\n    return 1\n",
+        encoding="utf-8",
+    )
+    result = compare_files(generated, original, Config())
+    ids = {f.rule_id for f in result.findings}
+    assert "NE101" not in ids
+    assert "NE102" not in ids
+    assert "NE103" not in ids
+    assert "NE104" not in ids
+
+
+def test_cli_errors_exit_two_when_files_scanned(tmp_path: Path, capsys) -> None:
+    good = tmp_path / "ok.py"
+    good.write_text("x = 1\n", encoding="utf-8")
+    from noellipsis import cli as cli_mod
+
+    real_scan = cli_mod.Scanner.scan_path
+
+    def wrapped(self, target):
+        result = real_scan(self, target)
+        result.errors.append("Unreadable file: sibling.py: Permission denied")
+        return result
+
+    cli_mod.Scanner.scan_path = wrapped
+    try:
+        code = main(["check", str(good)])
+    finally:
+        cli_mod.Scanner.scan_path = real_scan
+    assert code == 2
+    assert "Unreadable file" in capsys.readouterr().err
+
+
+def test_markdown_atx_heading_is_not_ne001(tmp_path: Path) -> None:
+    md = "# Insert your code here\n\nThen write the function.\n"
+    findings = Scanner(Config()).scan_text(tmp_path / "guide.md", md)
+    assert not any(f.rule_id == "NE001" for f in findings)
+    html = "<!-- Insert your code here -->\n"
+    findings = Scanner(Config()).scan_text(tmp_path / "guide.md", html)
+    assert any(f.rule_id == "NE001" for f in findings)
