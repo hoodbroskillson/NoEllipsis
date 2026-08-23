@@ -11,11 +11,11 @@ inputs:
     required: false
     default: "."
   command:
-    description: "Mode: check, git-diff, or compare"
+    description: "Mode: check, git-diff, or compare. Empty falls back to mode, then check."
     required: false
-    default: check
+    default: ""
   mode:
-    description: Alias for command (check | git-diff | compare)
+    description: Alias for command (check | git-diff | compare). Empty unless set.
     required: false
     default: ""
   fail-on:
@@ -31,7 +31,7 @@ inputs:
     required: false
     default: ""
   config:
-    description: Optional extra config hint (reserved; pyproject.toml is auto-discovered)
+    description: Path to a TOML file with [tool.noellipsis] (passed as --config)
     required: false
     default: ""
   against:
@@ -42,6 +42,18 @@ inputs:
     description: For git-diff, inspect staged changes only
     required: false
     default: "false"
+  sarif-file:
+    description: When format is sarif, write validated SARIF 2.1.0 bytes here
+    required: false
+    default: noellipsis.sarif
+
+outputs:
+  sarif-file:
+    description: Absolute path of the written SARIF file (empty unless format is sarif)
+    value: ${{ steps.run.outputs.sarif-file }}
+  exit-code:
+    description: Exit code from the NoEllipsis process
+    value: ${{ steps.run.outputs.exit-code }}
 
 runs:
   using: composite
@@ -54,6 +66,7 @@ runs:
       shell: bash
       run: python -m pip install --disable-pip-version-check "${GITHUB_ACTION_PATH}"
     - name: Run NoEllipsis
+      id: run
       shell: bash
       env:
         INPUT_PATH: ${{ inputs.path }}
@@ -65,4 +78,5 @@ runs:
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_AGAINST: ${{ inputs.against }}
         INPUT_STAGED: ${{ inputs.staged }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
       run: python "${GITHUB_ACTION_PATH}/action/run.py"
