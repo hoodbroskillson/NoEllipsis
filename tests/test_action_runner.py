@@ -118,7 +118,8 @@ def test_validate_sarif_bytes() -> None:
 def test_action_yml_pins() -> None:
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     readme = (ROOT / "action/README.md").read_text(encoding="utf-8")
-    assert "v1.1.1" in readme
+    from noellipsis import __version__
+    assert f"v{__version__}" in readme
     assert "GITHUB_ACTION_PATH" in action
     assert "action/run.py" in action
     assert "actions/setup-python@v7" in action

@@ -15,7 +15,8 @@ def test_precommit_hook_metadata() -> None:
     assert "pass_filenames: false" in text
     assert "language: python" in text
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "rev: v1.1.1" in readme
+    from noellipsis import __version__
+    assert f"rev: v{__version__}" in readme
 
 
 def test_consumer_repo_hook_fails_on_incomplete_staged(tmp_path: Path) -> None:
