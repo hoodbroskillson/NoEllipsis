@@ -1,0 +1,8 @@
+# Copy the table below into your project's pyproject.toml
+# or keep this file as a reference.
+
+[tool.noellipsis]
+shrink-threshold = 40
+fail-on = "error"
+exclude = ["vendor/**", "generated/**"]
+disable = ["NE103"]
