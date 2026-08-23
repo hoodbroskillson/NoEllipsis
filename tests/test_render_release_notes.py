@@ -63,3 +63,9 @@ def test_missing_notes_file(tmp_path: Path) -> None:
 def test_write_sha256sums_empty(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="no wheel"):
         write_sha256sums(tmp_path)
+
+
+def test_github_actions_expressions_are_not_placeholders() -> None:
+    text = render_notes("# v\n" + MARKER + "\n${{ steps.scan.outputs.sarif-file }}\n", "abc")
+    assert "${{ steps.scan.outputs.sarif-file }}" in text
+    assert MARKER not in text

@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 MARKER = "{{SHA256SUMS}}"
-PLACEHOLDER = re.compile(r"\{\{[^}]+\}\}")
+PLACEHOLDER = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
 
 
 def project_version(root: Path) -> str:
