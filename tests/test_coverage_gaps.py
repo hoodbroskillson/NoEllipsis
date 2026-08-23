@@ -259,6 +259,8 @@ def test_git_c_unquote_and_octal() -> None:
     assert _c_unquote('"oct\\141"') == "octa"
     assert _c_unquote('"x\\q"') == "xq"
     assert _decode_git_path("b/plain.py") == "plain.py"
+    assert _c_unquote('"caf\\303\\251.js"') == "café.js"
+    assert _decode_git_path('"b/caf\\303\\251.js"') == "café.js"
     diff = (
         'diff --git a/x.py b/x.py\n'
         '--- a/x.py\n'

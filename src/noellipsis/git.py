@@ -150,13 +150,13 @@ def _resolve_pre_rename_path(root: Path, rel: str) -> str | None:
         for line in proc.stdout.splitlines():
             parts = line.split("\t")
             if len(parts) >= 3 and parts[0].startswith("R"):
-                old, new = parts[1], parts[2]
+                old, new = _decode_quoted_path(parts[1]), _decode_quoted_path(parts[2])
                 if new == rel and old != rel:
                     return old
     proc = run_git(["log", "--follow", "--name-only", "--format=", "--", rel], cwd=root)
     if proc.returncode == 0:
         for name in proc.stdout.splitlines():
-            name = name.strip()
+            name = _decode_quoted_path(name.strip())
             if name and name != rel:
                 return name
     return None
@@ -283,21 +283,40 @@ def parse_diff_details(diff_text: str) -> list[DiffFile]:
     return list(files.values())
 
 
+def _decode_quoted_path(value: str) -> str:
+    """Unquote a git C-quoted path field if needed."""
+    value = value.strip()
+    if value.startswith('"'):
+        return _c_unquote(value)
+    return value
+
+
 def _c_unquote(value: str) -> str:
+    """Decode a git C-quoted string (octal escapes are UTF-8 bytes, not code points)."""
     if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
         value = value[1:-1]
-    out: list[str] = []
+    out = bytearray()
     i = 0
     while i < len(value):
         ch = value[i]
         if ch != "\\" or i + 1 >= len(value):
-            out.append(ch)
+            out.extend(ch.encode("utf-8"))
             i += 1
             continue
         nxt = value[i + 1]
-        simple = {"a": "\a", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v", '"': '"', "\\": "\\"}
+        simple = {
+            "a": b"\a",
+            "b": b"\b",
+            "f": b"\f",
+            "n": b"\n",
+            "r": b"\r",
+            "t": b"\t",
+            "v": b"\v",
+            '"': b'"',
+            "\\": b"\\",
+        }
         if nxt in simple:
-            out.append(simple[nxt])
+            out.extend(simple[nxt])
             i += 2
             continue
         if nxt in "01234567":
@@ -306,12 +325,12 @@ def _c_unquote(value: str) -> str:
             while j < len(value) and len(digits) < 3 and value[j] in "01234567":
                 digits.append(value[j])
                 j += 1
-            out.append(chr(int("".join(digits), 8)))
+            out.append(int("".join(digits), 8))
             i = j
             continue
-        out.append(nxt)
+        out.extend(nxt.encode("utf-8"))
         i += 2
-    return "".join(out)
+    return out.decode("utf-8")
 
 
 def _decode_git_path(rest: str) -> str | None:

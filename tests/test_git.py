@@ -188,3 +188,38 @@ def test_run_git_unicode_decode_fallback(tmp_path: Path, monkeypatch) -> None:
     assert proc.returncode == 0
     assert "git" in proc.stdout.lower() or proc.stdout
 
+
+
+def test_parse_diff_c_quoted_utf8_path() -> None:
+    diff = (
+        'diff --git "a/caf\\303\\251.js" "b/caf\\303\\251.js"\n'
+        '--- "a/caf\\303\\251.js"\n'
+        '+++ "b/caf\\303\\251.js"\n'
+        "@@ -3,1 +2,0 @@\n"
+        "-}\n"
+    )
+    files = parse_diff_details(diff)
+    assert len(files) == 1
+    assert files[0].path == "café.js"
+
+
+def test_git_diff_quoted_utf8_filename_reports_delete_closer(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    target = tmp_path / "café.js"
+    target.write_text("function f() {\n  return 1;\n}\n", encoding="utf-8")
+    _git(["add", "café.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    target.write_text("function f() {\n  return 1;\n", encoding="utf-8")
+    result = scan_git_diff(Config(), staged=False, cwd=tmp_path)
+    assert any(f.rule_id == "NE005" for f in result.findings)
+
+
+def test_resolve_pre_rename_path_quoted_utf8(tmp_path: Path) -> None:
+    _git(["init"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "checkout", "-b", "main"], tmp_path)
+    (tmp_path / "café.js").write_text("function f() {\n  return 1;\n}\n", encoding="utf-8")
+    _git(["add", "café.js"], tmp_path)
+    _git(["-c", "user.email=t@t.test", "-c", "user.name=t", "commit", "-m", "init"], tmp_path)
+    _git(["mv", "café.js", "café2.js"], tmp_path)
+    assert _resolve_pre_rename_path(tmp_path, "café2.js") == "café.js"
