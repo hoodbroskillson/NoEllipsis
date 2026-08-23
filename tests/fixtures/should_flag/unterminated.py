@@ -1,0 +1,3 @@
+def leftover():
+    s = 'oops
+    ...

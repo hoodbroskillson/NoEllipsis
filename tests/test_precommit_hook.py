@@ -11,4 +11,4 @@ def test_precommit_hook_metadata() -> None:
     assert "pass_filenames: false" in text
     assert "language: python" in text
     readme = (root / "README.md").read_text(encoding="utf-8")
-    assert "rev: v1.0.0" in readme
+    assert "rev: v1.1.0" in readme

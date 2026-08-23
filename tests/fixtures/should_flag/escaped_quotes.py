@@ -1,0 +1,3 @@
+msg = "He said \"hello\""
+def leftover():
+    ...

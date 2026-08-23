@@ -10,7 +10,7 @@ from pathlib import Path
 from noellipsis import __version__
 from noellipsis.compare import compare_files
 from noellipsis.config import ConfigError, apply_cli_overrides, load_pyproject
-from noellipsis.formatters import format_result
+from noellipsis.formatters import format_result, format_rules
 from noellipsis.git import GitError, scan_git_diff
 from noellipsis.models import ScanResult
 from noellipsis.scanner import Scanner
@@ -75,9 +75,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--format",
         dest="output_format",
-        choices=("text", "json", "github"),
+        choices=("text", "json", "github", "sarif"),
         default=None,
-        help="Output format (default: text)",
+        help="Output format: text, json, github, or sarif (default: text)",
     )
     parser.add_argument(
         "--fail-on",
@@ -134,6 +134,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Inspect staged changes only",
     )
+
+    sub.add_parser(
+        "rules",
+        help="List built-in rules (id, default severity, short description)",
+    )
     return parser
 
 
@@ -156,6 +161,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if not args.command:
         parser.print_help()
+        return 0
+
+    if args.command == "rules":
+        fmt = args.output_format or "text"
+        if fmt not in {"text", "json"}:
+            fmt = "text"
+        sys.stdout.write(format_rules(fmt))
         return 0
 
     start = Path.cwd()

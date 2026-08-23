@@ -1,0 +1,136 @@
+{
+  "should_flag": [
+    {
+      "path": "python_ellipsis.py",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "python_placeholder.py",
+      "rule_ids": [
+        "NE001"
+      ]
+    },
+    {
+      "path": "js_placeholder.js",
+      "rule_ids": [
+        "NE001"
+      ]
+    },
+    {
+      "path": "ts_ellipsis.ts",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "go_unbalanced.go",
+      "rule_ids": [
+        "NE005"
+      ]
+    },
+    {
+      "path": "rust_ellipsis.rs",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "shell_placeholder.sh",
+      "rule_ids": [
+        "NE001"
+      ]
+    },
+    {
+      "path": "unclosed.md",
+      "rule_ids": [
+        "NE004"
+      ]
+    },
+    {
+      "path": "conflict.py",
+      "rule_ids": [
+        "NE007"
+      ]
+    },
+    {
+      "path": "escaped_quotes.py",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "unicode_名前.py",
+      "rule_ids": [
+        "NE001"
+      ]
+    },
+    {
+      "path": "crlf.py",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "no_final_newline.py",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "long_line.py",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "path": "unterminated.py",
+      "rule_ids": [
+        "NE006"
+      ]
+    }
+  ],
+  "should_not_flag": [
+    {
+      "path": "python_string.py",
+      "rule_ids": []
+    },
+    {
+      "path": "js_spread.js",
+      "rule_ids": []
+    },
+    {
+      "path": "go_raw.go",
+      "rule_ids": []
+    },
+    {
+      "path": "rust_raw.rs",
+      "rule_ids": []
+    },
+    {
+      "path": "shell_heredoc.sh",
+      "rule_ids": []
+    },
+    {
+      "path": "python_ok.py",
+      "rule_ids": []
+    },
+    {
+      "path": "unicode_ok.py",
+      "rule_ids": []
+    },
+    {
+      "path": "crlf_ok.py",
+      "rule_ids": []
+    },
+    {
+      "path": "no_nl_ok.py",
+      "rule_ids": []
+    },
+    {
+      "path": "ts_spread.ts",
+      "rule_ids": []
+    }
+  ]
+}

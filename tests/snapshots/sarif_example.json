@@ -1,0 +1,191 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "invocations": [
+        {
+          "executionSuccessful": true
+        }
+      ],
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/example.py"
+                },
+                "region": {
+                  "startColumn": 5,
+                  "startLine": 84
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Bare ellipsis used as function body"
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "3459fe8ba9d61979"
+          },
+          "ruleId": "NE002"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/hoodbroskillson/NoEllipsis",
+          "name": "NoEllipsis",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Detects LLM-style placeholder comments such as 'Rest of code unchanged', 'Insert your code here', or stub-like TODO/FIXME notes. Phrases inside strings, docstrings, templates, raw strings, and heredocs are ignored."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE001",
+              "shortDescription": {
+                "text": "Placeholder phrase in a real comment"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "A Python function whose entire body is '...' is an error. Other languages flag a lone '...' statement that is not inside a string or comment."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE002",
+              "shortDescription": {
+                "text": "Bare ellipsis used as an incomplete body"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Warns when a Python function body is only 'pass' or 'raise NotImplementedError', unless the function is abstract, a Protocol stub, a .pyi stub, or an empty constructor."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE003",
+              "shortDescription": {
+                "text": "pass-only or NotImplementedError-only function"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "A Markdown file opened a fenced code block (``` or ~~~) that was never closed."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE004",
+              "shortDescription": {
+                "text": "Unclosed Markdown code fence"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Parentheses, brackets, or braces are unbalanced after skipping strings and comments."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE005",
+              "shortDescription": {
+                "text": "Unbalanced brackets"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "ast.parse failed, which often means the file was cut off mid-statement."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE006",
+              "shortDescription": {
+                "text": "Python syntax error or truncated statement"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Git conflict markers (<<<<<<< / ======= / >>>>>>>) remain in the file."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE007",
+              "shortDescription": {
+                "text": "Unresolved merge-conflict markers"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "compare: the generated file is at least shrink-threshold percent smaller than the original."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE101",
+              "shortDescription": {
+                "text": "Candidate dramatically shorter than the original"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "compare: a top-level symbol present in the original is missing from the candidate."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE102",
+              "shortDescription": {
+                "text": "Top-level function, class, or method removed"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "compare: import statements present in the original are missing from the candidate."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE103",
+              "shortDescription": {
+                "text": "Imports unexpectedly removed"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "compare: the candidate looks like a snippet pasted over an entire original file."
+              },
+              "helpUri": "https://github.com/hoodbroskillson/NoEllipsis/blob/v1.1.0/README.md#rules",
+              "id": "NE104",
+              "shortDescription": {
+                "text": "Probable full-file replacement with a partial snippet"
+              }
+            }
+          ],
+          "semanticVersion": "1.1.0",
+          "version": "1.1.0"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
