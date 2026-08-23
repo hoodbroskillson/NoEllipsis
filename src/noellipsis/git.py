@@ -19,14 +19,31 @@ class GitError(Exception):
 
 
 def run_git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603 — fixed argv, shell=False
-        ["git", *args],
-        cwd=cwd,
-        shell=False,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        return subprocess.run(  # noqa: S603 — fixed argv, shell=False
+            ["git", *args],
+            cwd=cwd,
+            shell=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
+    except UnicodeDecodeError:
+        proc = subprocess.run(  # noqa: S603 — fixed argv, shell=False
+            ["git", *args],
+            cwd=cwd,
+            shell=False,
+            capture_output=True,
+            check=False,
+        )
+        return subprocess.CompletedProcess(
+            proc.args,
+            proc.returncode,
+            stdout=(proc.stdout or b"").decode("utf-8", errors="replace"),
+            stderr=(proc.stderr or b"").decode("utf-8", errors="replace"),
+        )
 
 
 def require_repo(cwd: Path | None = None) -> Path:
@@ -91,9 +108,7 @@ def scan_git_diff(config: Config, *, staged: bool = False, cwd: Path | None = No
             if finding.rule_id in {"NE005", "NE006"}:
                 if not on_added and not is_new:
                     if pre_ids is None:
-                        prior = _git_blob(root, f"HEAD:{rel_path}")
-                        if prior is None and patch.old_path and patch.old_path != rel_path:
-                            prior = _git_blob(root, f"HEAD:{patch.old_path}")
+                        prior = _prior_blob(root, rel_path, patch.old_path)
                         pre_ids = (
                             set()
                             if prior is None
@@ -112,8 +127,46 @@ def scan_git_diff(config: Config, *, staged: bool = False, cwd: Path | None = No
 
 
 
+def _prior_blob(root: Path, rel: str, old_path: str | None) -> str | None:
+    """HEAD contents for rel, following an uncommitted or recent rename if needed."""
+    prior = _git_blob(root, f"HEAD:{rel}")
+    if prior is not None:
+        return prior
+    seen: set[str] = {rel}
+    for candidate in (old_path, _resolve_pre_rename_path(root, rel)):
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        prior = _git_blob(root, f"HEAD:{candidate}")
+        if prior is not None:
+            return prior
+    return None
+
+
+def _resolve_pre_rename_path(root: Path, rel: str) -> str | None:
+    """Best-effort path of rel as it existed at HEAD (staged git mv, --follow)."""
+    proc = run_git(["diff", "HEAD", "--find-renames", "--name-status"], cwd=root)
+    if proc.returncode == 0:
+        for line in proc.stdout.splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3 and parts[0].startswith("R"):
+                old, new = parts[1], parts[2]
+                if new == rel and old != rel:
+                    return old
+    proc = run_git(["log", "--follow", "--name-only", "--format=", "--", rel], cwd=root)
+    if proc.returncode == 0:
+        for name in proc.stdout.splitlines():
+            name = name.strip()
+            if name and name != rel:
+                return name
+    return None
+
+
 def _git_blob(root: Path, spec: str) -> str | None:
-    proc = run_git(["show", spec], cwd=root)
+    try:
+        proc = run_git(["show", spec], cwd=root)
+    except UnicodeDecodeError:
+        return None
     if proc.returncode != 0:
         return None
     return proc.stdout
