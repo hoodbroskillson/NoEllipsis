@@ -1,0 +1,109 @@
+{
+  "curated": true,
+  "fn": 0,
+  "fp": 0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "samples": [
+    {
+      "bucket": "TP",
+      "flagged": true,
+      "label": "positive",
+      "path": "corpus/positive/ellipsis.py",
+      "rule_ids": [
+        "NE002"
+      ]
+    },
+    {
+      "bucket": "TP",
+      "flagged": true,
+      "label": "positive",
+      "path": "corpus/positive/placeholder.py",
+      "rule_ids": [
+        "NE001"
+      ]
+    },
+    {
+      "bucket": "TP",
+      "flagged": true,
+      "label": "positive",
+      "path": "corpus/positive/pass_only.py",
+      "rule_ids": [
+        "NE003"
+      ]
+    },
+    {
+      "bucket": "TP",
+      "flagged": true,
+      "label": "positive",
+      "path": "corpus/positive/unterminated.py",
+      "rule_ids": [
+        "NE005",
+        "NE006"
+      ]
+    },
+    {
+      "bucket": "TP",
+      "flagged": true,
+      "label": "positive",
+      "path": "corpus/positive/conflict.py",
+      "rule_ids": [
+        "NE006",
+        "NE007"
+      ]
+    },
+    {
+      "bucket": "TP",
+      "flagged": true,
+      "label": "positive",
+      "path": "corpus/positive/unclosed.md",
+      "rule_ids": [
+        "NE004"
+      ]
+    },
+    {
+      "bucket": "TN",
+      "flagged": false,
+      "label": "negative",
+      "path": "corpus/negative/real_function.py",
+      "rule_ids": []
+    },
+    {
+      "bucket": "TN",
+      "flagged": false,
+      "label": "negative",
+      "path": "corpus/negative/string_ellipsis.py",
+      "rule_ids": []
+    },
+    {
+      "bucket": "TN",
+      "flagged": false,
+      "label": "negative",
+      "path": "corpus/negative/abstractmethod.py",
+      "rule_ids": []
+    },
+    {
+      "bucket": "TN",
+      "flagged": false,
+      "label": "negative",
+      "path": "corpus/negative/empty_init.py",
+      "rule_ids": []
+    },
+    {
+      "bucket": "TN",
+      "flagged": false,
+      "label": "negative",
+      "path": "corpus/negative/spread.js",
+      "rule_ids": []
+    },
+    {
+      "bucket": "TN",
+      "flagged": false,
+      "label": "negative",
+      "path": "corpus/negative/prose.py",
+      "rule_ids": []
+    }
+  ],
+  "tn": 6,
+  "tp": 6
+}

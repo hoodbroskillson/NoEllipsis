@@ -1,0 +1,53 @@
+{
+  "curated": true,
+  "samples": [
+    {
+      "path": "corpus/positive/ellipsis.py",
+      "label": "positive"
+    },
+    {
+      "path": "corpus/positive/placeholder.py",
+      "label": "positive"
+    },
+    {
+      "path": "corpus/positive/pass_only.py",
+      "label": "positive"
+    },
+    {
+      "path": "corpus/positive/unterminated.py",
+      "label": "positive"
+    },
+    {
+      "path": "corpus/positive/conflict.py",
+      "label": "positive"
+    },
+    {
+      "path": "corpus/positive/unclosed.md",
+      "label": "positive"
+    },
+    {
+      "path": "corpus/negative/real_function.py",
+      "label": "negative"
+    },
+    {
+      "path": "corpus/negative/string_ellipsis.py",
+      "label": "negative"
+    },
+    {
+      "path": "corpus/negative/abstractmethod.py",
+      "label": "negative"
+    },
+    {
+      "path": "corpus/negative/empty_init.py",
+      "label": "negative"
+    },
+    {
+      "path": "corpus/negative/spread.js",
+      "label": "negative"
+    },
+    {
+      "path": "corpus/negative/prose.py",
+      "label": "negative"
+    }
+  ]
+}
